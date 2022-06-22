@@ -77,8 +77,7 @@ impl TcpPut {
 
 impl Stream for TcpPut {
     fn add_to_inbound(&mut self, opaque_message: &OpaqueMessage) {
-        self.stream
-            .write_all(&mut opaque_message.clone().encode())
+        self.write_all(&mut opaque_message.clone().encode())
             .unwrap();
     }
 
@@ -126,7 +125,9 @@ impl Read for TcpPut {
 
 impl Write for TcpPut {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.stream.write(buf)
+        let i = self.stream.write(buf)?;
+        self.stream.flush()?;
+        Ok(i)
     }
 
     fn flush(&mut self) -> io::Result<()> {
