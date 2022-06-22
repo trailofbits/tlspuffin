@@ -70,7 +70,7 @@ impl TcpPut {
         // We are waiting 1 second for a response of the PUT behind the TCP socket.
         // If we are expecting data from it and this timeout is reached, then we assume that
         // no more will follow.
-        stream.set_read_timeout(Some(Duration::from_secs(1)))?;
+        stream.set_read_timeout(Some(Duration::from_millis(100)))?;
         stream.set_nodelay(true)?;
         Ok(stream)
     }
@@ -78,31 +78,27 @@ impl TcpPut {
 
 impl Stream for TcpPut {
     fn add_to_inbound(&mut self, opaque_message: &OpaqueMessage) {
-        info!("add_to_inbound");
-        self.stream
-            .write_all(&mut opaque_message.clone().encode())
+        self.write_all(&mut opaque_message.clone().encode())
             .unwrap();
-        self.stream.flush().unwrap();
+        self.flush().unwrap();
     }
 
     fn take_message_from_outbound(&mut self) -> Result<Option<MessageResult>, Error> {
-        info!("take_message_from_outbound");
         // Retry to read if no more frames in the deframer buffer
-        let opaque_message = {
+        let opaque_message = loop {
             if let Some(opaque_message) = self.deframer.frames.pop_front() {
-                Some(opaque_message)
+                break Some(opaque_message);
             } else {
-                info!("take_message_from_outbound read");
                 if let Err(e) = self.deframer.read(&mut self.stream) {
                     match e.kind() {
                         ErrorKind::WouldBlock => {
                             // This is not a hard error. It just means we will should read again from
                             // the TCPStream in the next steps.
+                            break None;
                         }
                         _ => return Err(e.into()),
                     }
                 }
-                self.deframer.frames.pop_front()
             }
         };
 
@@ -131,14 +127,10 @@ impl Read for TcpPut {
 
 impl Write for TcpPut {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        info!("write");
-        let i = self.stream.write(buf)?;
-        self.stream.flush()?;
-        Ok(i)
+        self.stream.write(buf)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        info!("flush");
         self.stream.flush()
     }
 }
@@ -246,16 +238,18 @@ mod tests {
 
             let dir = tempdir().unwrap();
             let key = dir.path().join("key.pem");
+            let key_path = key.as_path().to_str().unwrap();
             let cert = dir.path().join("cert.pem");
+            let cert_path = cert.as_path().to_str().unwrap();
             let output = Command::new("openssl")
                 .arg("req")
                 .arg("-x509")
                 .arg("-newkey")
                 .arg("rsa:2048")
                 .arg("-keyout")
-                .arg(key.as_path().to_str().unwrap())
+                .arg(key_path)
                 .arg("-out")
-                .arg(cert.as_path().to_str().unwrap())
+                .arg(cert_path)
                 .arg("-days")
                 .arg("365")
                 .arg("-nodes")
@@ -281,9 +275,9 @@ mod tests {
                         .arg("-msg")
                         .arg("-state")
                         .arg("-key")
-                        .arg(key.as_path().to_str().unwrap())
+                        .arg(key_path)
                         .arg("-cert")
-                        .arg(cert.as_path().to_str().unwrap())
+                        .arg(cert_path)
                         .stdin(Stdio::piped()) // This line is super important! Else the OpenSSL server immediately stops
                         .stdout(Stdio::piped())
                         .stderr(Stdio::piped())
@@ -297,7 +291,6 @@ mod tests {
 
     impl Drop for OpenSSLServer {
         fn drop(&mut self) {
-            eprintln!("stopping openssl server");
             let child = &mut self.child;
             child
                 .as_mut()
