@@ -270,14 +270,6 @@ mod tests {
 
     impl Drop for OpenSSLServer {
         fn drop(&mut self) {
-            /*let err = self.child.stderr.take().unwrap();
-            err.read()
-            stderr()
-                .write_all(&stderr1)
-                .unwrap();
-            stderr()
-                .write_all(&self.child.stdout.take().unwrap())
-                .unwrap();*/
             let child = &mut self.child;
             child
                 .as_mut()
