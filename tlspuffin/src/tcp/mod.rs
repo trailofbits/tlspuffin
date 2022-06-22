@@ -271,6 +271,7 @@ mod tests {
 
     impl Drop for OpenSSLServer {
         fn drop(&mut self) {
+            eprintln!("stopping openssl server");
             let child = &mut self.child;
             child
                 .as_mut()
@@ -282,8 +283,11 @@ mod tests {
                 .unwrap()
                 .wait_with_output()
                 .expect("failed to wait on child");
+            eprintln!("--- stderr from openssl server");
             stderr().write_all(&output.stderr).unwrap();
+            eprintln!("--- stdout from openssl server");
             stderr().write_all(&output.stdout).unwrap();
+            eprintln!("---");
         }
     }
 
