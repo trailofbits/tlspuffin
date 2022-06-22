@@ -158,7 +158,6 @@ impl Put for TcpPut {
     }
 
     fn reset(&mut self) -> Result<(), Error> {
-        self.stream.shutdown(Shutdown::Both)?;
         let address = self.stream.peer_addr()?;
         self.stream = Self::new_stream(address)?;
         Ok(())
