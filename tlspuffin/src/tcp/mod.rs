@@ -71,6 +71,7 @@ impl TcpPut {
         // If we are expecting data from it and this timeout is reached, then we assume that
         // no more will follow.
         stream.set_read_timeout(Some(Duration::from_secs(1)))?;
+        stream.set_nodelay(true)?;
         Ok(stream)
     }
 }
