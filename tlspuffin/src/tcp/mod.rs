@@ -84,20 +84,20 @@ impl Stream for TcpPut {
 
     fn take_message_from_outbound(&mut self) -> Result<Option<MessageResult>, Error> {
         // Retry to read if no more frames in the deframer buffer
-        let opaque_message = loop {
+        let opaque_message = {
             if let Some(opaque_message) = self.deframer.frames.pop_front() {
-                break Some(opaque_message);
+                Some(opaque_message)
             } else {
                 if let Err(e) = self.deframer.read(&mut self.stream) {
                     match e.kind() {
                         ErrorKind::WouldBlock => {
                             // This is not a hard error. It just means we will should read again from
                             // the TCPStream in the next steps.
-                            break None;
                         }
                         _ => return Err(e.into()),
                     }
                 }
+                self.deframer.frames.pop_front()
             }
         };
 
