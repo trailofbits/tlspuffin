@@ -210,9 +210,11 @@ impl Put for TcpPut {
 mod tests {
     use std::{
         io::{stderr, Read, Write},
+        os::unix::io::RawFd,
         process::{Child, Command, Stdio},
     };
 
+    use libafl::executors::forkserver::ConfigTarget;
     use tempfile::{tempdir, TempDir};
 
     use crate::{
@@ -282,7 +284,8 @@ mod tests {
                         .arg(key.as_path().to_str().unwrap())
                         .arg("-cert")
                         .arg(cert.as_path().to_str().unwrap())
-                        .stdin(Stdio::null())
+                        //.setstdin(0, true)
+                        .stdin(Stdio::piped())
                         .stdout(Stdio::piped())
                         .stderr(Stdio::piped())
                         .spawn()
