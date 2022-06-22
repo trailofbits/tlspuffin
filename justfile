@@ -22,7 +22,7 @@ fix PROJECT ARCH FEATURES CARGO_FLAGS="": install-clippy
   cargo clippy --no-deps -p {{PROJECT}} --target {{ARCH}} --features "{{FEATURES}}" {{CARGO_FLAGS}} --fix
 
 test PROJECT ARCH FEATURES CARGO_FLAGS="":
-  RUST_TEST_TIME_UNIT=5000,600000 cargo test -p {{PROJECT}} --target {{ARCH}} --features "{{FEATURES}}" {{CARGO_FLAGS}} -- -Zunstable-options --ensure-time --nocapture
+  cargo test -p {{PROJECT}} --target {{ARCH}} --features "{{FEATURES}}" {{CARGO_FLAGS}}
 
 build PROJECT ARCH FEATURES CARGO_FLAGS="":
   cargo build -p {{PROJECT}} --target {{ARCH}} --release --features "{{FEATURES}}" {{CARGO_FLAGS}}
