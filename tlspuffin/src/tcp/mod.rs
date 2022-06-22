@@ -284,8 +284,7 @@ mod tests {
                         .arg(key.as_path().to_str().unwrap())
                         .arg("-cert")
                         .arg(cert.as_path().to_str().unwrap())
-                        //.setstdin(0, true)
-                        .stdin(Stdio::piped())
+                        .stdin(Stdio::piped()) // This line is super important! Else the OpenSSL server immediately stops
                         .stdout(Stdio::piped())
                         .stderr(Stdio::piped())
                         .spawn()
