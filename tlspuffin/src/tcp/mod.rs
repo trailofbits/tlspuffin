@@ -196,7 +196,10 @@ impl Put for TcpPut {
 
 #[cfg(test)]
 mod tests {
-    use std::process::{Child, Command};
+    use std::{
+        io::{stderr, Read, Write},
+        process::{Child, Command, Stdio},
+    };
 
     use tempfile::{tempdir, TempDir};
 
@@ -208,7 +211,7 @@ mod tests {
     };
 
     struct OpenSSLServer {
-        child: Child,
+        child: Option<Child>,
         tmp: TempDir,
     }
 
@@ -217,7 +220,7 @@ mod tests {
             let dir = tempdir().unwrap();
             let key = dir.path().join("key.pem");
             let cert = dir.path().join("cert.pem");
-            let _output = Command::new("openssl")
+            let output = Command::new("openssl")
                 .arg("req")
                 .arg("-x509")
                 .arg("-newkey")
@@ -231,29 +234,33 @@ mod tests {
                 .arg("-nodes")
                 .arg("-subj")
                 .arg("/C=US/ST=New Sweden/L=Stockholm/O=.../OU=.../CN=.../emailAddress=...")
-                /*.stdout(Stdio::null())
-                .stderr(Stdio::null())*/
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
                 .spawn()
                 .expect("failed to generate certs")
-                .wait()
+                .wait_with_output()
                 .expect("failed to wait on child");
 
+            stderr().write_all(&output.stderr).unwrap();
+            stderr().write_all(&output.stdout).unwrap();
+
             Self {
-                child: Command::new("openssl")
-                    .arg("s_server")
-                    .arg("-accept")
-                    .arg(port.to_string())
-                    .arg("-msg")
-                    .arg("-debug")
-                    .arg("-state")
-                    .arg("-key")
-                    .arg(key.as_path().to_str().unwrap())
-                    .arg("-cert")
-                    .arg(cert.as_path().to_str().unwrap())
-                    /*.stdout(Stdio::null())
-                    .stderr(Stdio::null())*/
-                    .spawn()
-                    .expect("failed to execute process"),
+                child: Some(
+                    Command::new("openssl")
+                        .arg("s_server")
+                        .arg("-accept")
+                        .arg(port.to_string())
+                        .arg("-msg")
+                        .arg("-state")
+                        .arg("-key")
+                        .arg(key.as_path().to_str().unwrap())
+                        .arg("-cert")
+                        .arg(cert.as_path().to_str().unwrap())
+                        .stdout(Stdio::piped())
+                        .stderr(Stdio::piped())
+                        .spawn()
+                        .expect("failed to execute process"),
+                ),
                 tmp: dir,
             }
         }
@@ -261,12 +268,31 @@ mod tests {
 
     impl Drop for OpenSSLServer {
         fn drop(&mut self) {
-            self.child.kill().expect("failed to stop server");
+            /*let err = self.child.stderr.take().unwrap();
+            err.read()
+            stderr()
+                .write_all(&stderr1)
+                .unwrap();
+            stderr()
+                .write_all(&self.child.stdout.take().unwrap())
+                .unwrap();*/
+            let child = &mut self.child;
+            child
+                .as_mut()
+                .unwrap()
+                .kill()
+                .expect("failed to stop server");
+            let output = child
+                .take()
+                .unwrap()
+                .wait_with_output()
+                .expect("failed to wait on child");
+            stderr().write_all(&output.stderr).unwrap();
+            stderr().write_all(&output.stdout).unwrap();
         }
     }
 
     #[test]
-    #[ignore]
     fn test_tcp_put_session_resumption_dhe_full() {
         let _guard = OpenSSLServer::new(44330);
 
