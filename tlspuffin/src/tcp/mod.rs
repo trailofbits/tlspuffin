@@ -67,9 +67,10 @@ pub struct TcpPut {
 impl TcpPut {
     fn new_stream<A: ToSocketAddrs>(addr: A) -> io::Result<TcpStream> {
         let stream = TcpStream::connect(addr)?;
-        // FIXME: instead of having a timeout, switch to non-blocking sockets. In this case
-        // we would wait for new data with the Put::progress function
-        stream.set_read_timeout(Some(Duration::from_millis(500)))?;
+        // We are waiting 1 second for a response of the PUT behind the TCP socket.
+        // If we are expecting data from it and this timeout is reached, then we assume that
+        // no more will follow.
+        stream.set_read_timeout(Some(Duration::from_secs(1)))?;
         Ok(stream)
     }
 }
@@ -82,24 +83,25 @@ impl Stream for TcpPut {
     }
 
     fn take_message_from_outbound(&mut self) -> Result<Option<MessageResult>, Error> {
-        let mut first_message = self.deframer.frames.pop_front();
-
         // Retry to read if no more frames in the deframer buffer
-        if first_message.is_none() {
-            if let Err(e) = self.deframer.read(&mut self.stream) {
-                let kind = e.kind();
-                match kind {
-                    ErrorKind::WouldBlock => {
-                        // This is not a hard error. It just means we will should read again from
-                        // the TCPStream in the next steps.
+        let opaque_message = loop {
+            if let Some(opaque_message) = self.deframer.frames.pop_front() {
+                break Some(opaque_message);
+            } else {
+                if let Err(e) = self.deframer.read(&mut self.stream) {
+                    match e.kind() {
+                        ErrorKind::WouldBlock => {
+                            // This is not a hard error. It just means we will should read again from
+                            // the TCPStream in the next steps.
+                            break None;
+                        }
+                        _ => return Err(e.into()),
                     }
-                    _ => return Err(e.into()),
                 }
             }
-            first_message = self.deframer.frames.pop_front()
-        }
+        };
 
-        if let Some(opaque_message) = first_message {
+        if let Some(opaque_message) = opaque_message {
             let message = match Message::try_from(opaque_message.clone().into_plain_message()) {
                 Ok(message) => Some(message),
                 Err(err) => {
