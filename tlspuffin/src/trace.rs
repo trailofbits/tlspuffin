@@ -7,16 +7,16 @@
 //! # Example
 //!
 //! ```rust
-//! use tlspuffin::agent::{PutName, AgentName, AgentDescriptor, TLSVersion::*};
+//! use tlspuffin::agent::{AgentName, AgentDescriptor, TLSVersion::*};
 //! use tlspuffin::trace::{Step, TraceContext, Trace, Action, InputAction, OutputAction, Query, TlsMessageType};
 //! use tlspuffin::algebra::{Term, signature::Signature};
 //! use tlspuffin::tls::fn_impl::fn_client_hello;
 //! use rustls::{ProtocolVersion, CipherSuite};
 //! use rustls::msgs::handshake::{SessionID, Random, ClientExtension};
 //! use rustls::msgs::enums::{Compression, HandshakeType};
-//! # use tlspuffin::put_registry::current_put;
 //!
-//! # const PUT: PutName = current_put();
+//! # let client_put = tlspuffin::put_registry::current_put();
+//! # let server_put = tlspuffin::put_registry::current_put();
 //!
 //! let client: AgentName = AgentName::first();
 //! let server: AgentName = client.next();
@@ -29,8 +29,8 @@
 //! let trace = Trace {
 //!     prior_traces: vec![],
 //!     descriptors: vec![
-//!         AgentDescriptor::new_client(client, V1_3, PUT),
-//!         AgentDescriptor::new_server(server, V1_3, PUT),
+//!         AgentDescriptor::new_client(client, V1_3, client_put),
+//!         AgentDescriptor::new_server(server, V1_3, server_put),
 //!     ],
 //!     steps: vec![
 //!             Step { agent: client, action: Action::Output(OutputAction { }) },
