@@ -2,7 +2,7 @@ use std::{
     cell::RefCell,
     io,
     io::{ErrorKind, Read, Write},
-    net::{AddrParseError, IpAddr, SocketAddr, TcpStream, ToSocketAddrs},
+    net::{AddrParseError, IpAddr, Shutdown, SocketAddr, TcpStream, ToSocketAddrs},
     rc::Rc,
     str::FromStr,
     time::Duration,
@@ -166,6 +166,7 @@ impl Put for TcpPut {
     }
 
     fn reset(&mut self) -> Result<(), Error> {
+        self.stream.shutdown(Shutdown::Both)?;
         let address = self.stream.peer_addr()?;
         self.stream = Self::new_stream(address)?;
         Ok(())
@@ -228,6 +229,18 @@ mod tests {
 
     impl OpenSSLServer {
         pub fn new(port: u16) -> Self {
+            let output = Command::new("openssl")
+                .arg("version")
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .expect("failed to output version")
+                .wait_with_output()
+                .expect("failed to wait on child");
+
+            stderr().write_all(&output.stderr).unwrap();
+            stderr().write_all(&output.stdout).unwrap();
+
             let dir = tempdir().unwrap();
             let key = dir.path().join("key.pem");
             let cert = dir.path().join("cert.pem");
