@@ -70,7 +70,7 @@ impl TcpPut {
         // We are waiting 1 second for a response of the PUT behind the TCP socket.
         // If we are expecting data from it and this timeout is reached, then we assume that
         // no more will follow.
-        stream.set_read_timeout(Some(Duration::from_millis(100)))?;
+        stream.set_read_timeout(Some(Duration::from_millis(500)))?;
         stream.set_nodelay(true)?;
         Ok(stream)
     }
