@@ -231,6 +231,7 @@ mod tests {
         pub fn new(port: u16) -> Self {
             let output = Command::new("openssl")
                 .arg("version")
+                .stdin(Stdio::null())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .spawn()
@@ -258,6 +259,7 @@ mod tests {
                 .arg("-nodes")
                 .arg("-subj")
                 .arg("/C=US/ST=New Sweden/L=Stockholm/O=.../OU=.../CN=.../emailAddress=...")
+                .stdin(Stdio::null())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .spawn()
@@ -280,6 +282,7 @@ mod tests {
                         .arg(key.as_path().to_str().unwrap())
                         .arg("-cert")
                         .arg(cert.as_path().to_str().unwrap())
+                        .stdin(Stdio::null())
                         .stdout(Stdio::piped())
                         .stderr(Stdio::piped())
                         .spawn()
