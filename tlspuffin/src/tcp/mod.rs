@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-use log::error;
+use log::{error, info};
 use rustls::msgs::{
     deframer::MessageDeframer,
     message::{Message, OpaqueMessage},
@@ -77,16 +77,21 @@ impl TcpPut {
 
 impl Stream for TcpPut {
     fn add_to_inbound(&mut self, opaque_message: &OpaqueMessage) {
-        self.write_all(&mut opaque_message.clone().encode())
+        info!("add_to_inbound");
+        self.stream
+            .write_all(&mut opaque_message.clone().encode())
             .unwrap();
+        self.stream.flush().unwrap();
     }
 
     fn take_message_from_outbound(&mut self) -> Result<Option<MessageResult>, Error> {
+        info!("take_message_from_outbound");
         // Retry to read if no more frames in the deframer buffer
         let opaque_message = {
             if let Some(opaque_message) = self.deframer.frames.pop_front() {
                 Some(opaque_message)
             } else {
+                info!("take_message_from_outbound read");
                 if let Err(e) = self.deframer.read(&mut self.stream) {
                     match e.kind() {
                         ErrorKind::WouldBlock => {
@@ -125,12 +130,14 @@ impl Read for TcpPut {
 
 impl Write for TcpPut {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        info!("write");
         let i = self.stream.write(buf)?;
         self.stream.flush()?;
         Ok(i)
     }
 
     fn flush(&mut self) -> io::Result<()> {
+        info!("flush");
         self.stream.flush()
     }
 }
