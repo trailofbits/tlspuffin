@@ -28,7 +28,7 @@ where
     client_stats: Vec<ClientStats>,
     log_count: u64,
     stats_file: PathBuf,
-    serializer: JSONSerializer<BufWriter<File>>,
+    json_writer: JSONSerializer<BufWriter<File>>,
 }
 
 impl<F> Clone for StatsMonitor<F>
@@ -42,7 +42,7 @@ where
             client_stats: self.client_stats.clone(),
             log_count: self.log_count,
             stats_file: self.stats_file.clone(),
-            serializer: JSONSerializer::new(BufWriter::new(
+            json_writer: JSONSerializer::new(BufWriter::new(
                 OpenOptions::new()
                     .append(true)
                     .open(&self.stats_file)
@@ -147,7 +147,7 @@ where
             total_execs,
             exec_per_sec: exec_sec,
         }
-        .serialize(&mut self.serializer)
+        .serialize(&mut self.json_writer)
         .unwrap();
     }
 
@@ -410,7 +410,7 @@ where
     F: FnMut(String),
 {
     pub fn new(print_fn: F, stats_file: PathBuf) -> Result<Self, io::Error> {
-        let writer = JSONSerializer::new(BufWriter::new(
+        let json_writer = JSONSerializer::new(BufWriter::new(
             OpenOptions::new()
                 .append(true)
                 .create(true)
@@ -422,7 +422,7 @@ where
             client_stats: vec![],
             log_count: 0,
             stats_file,
-            serializer: writer,
+            json_writer,
         })
     }
 }
