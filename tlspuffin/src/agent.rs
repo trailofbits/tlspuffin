@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     error::Error,
-    put::{Put, PutConfig, PutDescriptor, PutName},
+    put::{Put, PutConfig, PutDescriptor},
     put_registry::PUT_REGISTRY,
     trace::ClaimList,
 };

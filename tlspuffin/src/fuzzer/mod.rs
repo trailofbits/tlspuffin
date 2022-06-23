@@ -74,7 +74,7 @@ mod tests {
             },
             term_zoo::generate_term_zoo,
         },
-        put_registry::{current_put, CURRENT_PUT_NAME, DUMMY_PUT},
+        put_registry::current_put,
         tls::{fn_impl::*, seeds::*, SIGNATURE},
         trace::{Action, Step, Trace},
     };
@@ -102,8 +102,8 @@ mod tests {
         let _rand = StdRand::with_seed(1235);
         let _corpus: InMemoryCorpus<Trace> = InMemoryCorpus::new();
         let mut state = create_state();
-        let server = AgentName::first();
-        let _trace = seed_client_attacker12(server, current_put());
+        let _server = AgentName::first();
+        let _trace = seed_client_attacker12.build_trace();
 
         let mut mutator = RepeatMutator::new(15);
 
@@ -117,7 +117,7 @@ mod tests {
         }
 
         loop {
-            let mut trace = seed_client_attacker12(server, current_put());
+            let mut trace = seed_client_attacker12.build_trace();
             mutator.mutate(&mut state, &mut trace, 0).unwrap();
 
             let length = trace.steps.len();
@@ -135,12 +135,12 @@ mod tests {
 
     #[test]
     fn test_replace_match_mutator() {
-        let server = AgentName::first();
+        let _server = AgentName::first();
         let mut state = create_state();
         let mut mutator = ReplaceMatchMutator::new(TermConstraints::default());
 
         loop {
-            let mut trace = seed_client_attacker12(server, current_put());
+            let mut trace = seed_client_attacker12.build_trace();
             mutator.mutate(&mut state, &mut trace, 0).unwrap();
 
             if let Some(last) = trace.steps.iter().last() {
@@ -165,7 +165,7 @@ mod tests {
     fn test_remove_lift_mutator() {
         // Should remove an extension
         let mut state = create_state();
-        let server = AgentName::first();
+        let _server = AgentName::first();
         let mut mutator = RemoveAndLiftMutator::new(TermConstraints::default());
 
         // Returns the amount of extensions in the trace
@@ -174,7 +174,7 @@ mod tests {
         }
 
         loop {
-            let mut trace = seed_client_attacker12(server, current_put());
+            let mut trace = seed_client_attacker12.build_trace();
             let before_mutation = sum_extension_appends(&trace);
             let result = mutator.mutate(&mut state, &mut trace, 0).unwrap();
 
@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn test_replace_reuse_mutator() {
         let mut state = create_state();
-        let server = AgentName::first();
+        let _server = AgentName::first();
         let mut mutator = ReplaceReuseMutator::new(TermConstraints::default());
 
         fn count_client_hello(trace: &Trace) -> u16 {
@@ -203,7 +203,7 @@ mod tests {
         }
 
         loop {
-            let mut trace = seed_client_attacker12(server, current_put());
+            let mut trace = seed_client_attacker12.build_trace();
             let result = mutator.mutate(&mut state, &mut trace, 0).unwrap();
 
             if let MutationResult::Mutated = result {
@@ -220,11 +220,11 @@ mod tests {
     #[test]
     fn test_skip_mutator() {
         let mut state = create_state();
-        let server = AgentName::first();
+        let _server = AgentName::first();
         let mut mutator = SkipMutator::new(2);
 
         loop {
-            let mut trace = seed_client_attacker12(server, current_put());
+            let mut trace = seed_client_attacker12.build_trace();
             let before_len = trace.steps.len();
             mutator.mutate(&mut state, &mut trace, 0).unwrap();
 
@@ -237,11 +237,10 @@ mod tests {
     #[test]
     fn test_swap_mutator() {
         let mut state = create_state();
-        let server = AgentName::first();
         let mut mutator = SwapMutator::new(TermConstraints::default());
 
         loop {
-            let mut trace = seed_client_attacker12(server, current_put());
+            let mut trace = seed_client_attacker12.build_trace();
             mutator.mutate(&mut state, &mut trace, 0).unwrap();
 
             let is_last_not_encrypt = if let Some(last) = trace.steps.iter().last() {
@@ -426,7 +425,7 @@ mod tests {
             agent::{AgentDescriptor, AgentName, TLSVersion},
             algebra::Term,
             graphviz::write_graphviz,
-            put::{PutDescriptor, PutName},
+            put::PutDescriptor,
             term,
             tls::fn_impl::*,
             trace::{Action, InputAction, Step, Trace},

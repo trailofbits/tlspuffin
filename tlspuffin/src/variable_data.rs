@@ -102,7 +102,7 @@ pub fn extract_knowledge(message: &Message) -> Result<Vec<Box<dyn VariableData>>
                 HandshakePayload::ServerHello(sh) => {
                     let vars: Vec<Box<dyn VariableData>> = vec![
                         Box::new(message.clone()),
-                        Box::new(hs.typ.clone()),
+                        Box::new(hs.typ),
                         Box::new(sh.random),
                         Box::new(sh.session_id),
                         Box::new(sh.cipher_suite),

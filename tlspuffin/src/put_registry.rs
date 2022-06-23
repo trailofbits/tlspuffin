@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::{
     agent::AgentName,
     put::{Put, PutConfig, PutDescriptor, PutName},

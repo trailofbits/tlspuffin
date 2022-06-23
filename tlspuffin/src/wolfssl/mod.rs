@@ -147,19 +147,18 @@ impl Put for WolfSSL {
         Ok(wolfssl)
     }
 
-    fn progress(&mut self) -> Result<(), Error> {
-        // FIXME
-        /*unsafe {
+    fn progress(&mut self, agent_name: &AgentName) -> Result<(), Error> {
+        unsafe {
             // FIXME: Improve code here -> deduplicate
             let claimer = self.config.claims.clone();
-            let name = self.config.agent_name;
+            let agent_name = *agent_name;
             claim_transcript(
                 self.stream.ssl().as_ptr(),
                 &mut move |claim: security_claims::Claim| {
-                    (*claimer).borrow_mut().claim(name, claim);
+                    (*claimer).borrow_mut().claim(agent_name, claim);
                 },
             )
-        }*/
+        }
 
         if self.is_state_successful() {
             // Trigger another read

@@ -1,6 +1,6 @@
 //! This module provides[`Term`]sas well as iterators over them.
 
-use std::{any::Any, fmt, fmt::Formatter, ops::Deref};
+use std::{any::Any, fmt, fmt::Formatter};
 
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,7 @@ use crate::{
     algebra::dynamic_function::TypeShape,
     error::Error,
     tls::error::FnError,
-    trace::{ByAgentClaimList, ClaimList, TraceContext},
+    trace::{ByAgentClaimList, TraceContext},
 };
 
 /// A first-order term: either a [`Variable`] or an application of an [`Function`].

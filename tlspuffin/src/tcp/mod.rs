@@ -2,14 +2,14 @@ use std::{
     cell::RefCell,
     io,
     io::{ErrorKind, Read, Write},
-    net::{AddrParseError, IpAddr, Shutdown, SocketAddr, TcpStream, ToSocketAddrs},
+    net::{AddrParseError, IpAddr, SocketAddr, TcpStream, ToSocketAddrs},
     rc::Rc,
     str::FromStr,
     thread,
     time::Duration,
 };
 
-use log::{error, info};
+use log::error;
 use rustls::msgs::{
     deframer::MessageDeframer,
     message::{Message, OpaqueMessage},
@@ -61,7 +61,6 @@ impl From<AddrParseError> for Error {
 /// ```
 pub struct TcpPut {
     stream: TcpStream,
-    outbound_buffer: io::Cursor<Vec<u8>>,
     deframer: MessageDeframer,
 }
 
@@ -106,16 +105,14 @@ impl Stream for TcpPut {
         let opaque_message = loop {
             if let Some(opaque_message) = self.deframer.frames.pop_front() {
                 break Some(opaque_message);
-            } else {
-                if let Err(e) = self.deframer.read(&mut self.stream) {
-                    match e.kind() {
-                        ErrorKind::WouldBlock => {
-                            // This is not a hard error. It just means we will should read again from
-                            // the TCPStream in the next steps.
-                            break None;
-                        }
-                        _ => return Err(e.into()),
+            } else if let Err(e) = self.deframer.read(&mut self.stream) {
+                match e.kind() {
+                    ErrorKind::WouldBlock => {
+                        // This is not a hard error. It just means we will should read again from
+                        // the TCPStream in the next steps.
+                        break None;
                     }
+                    _ => return Err(e.into()),
                 }
             }
         };
@@ -166,7 +163,7 @@ impl Put for TcpPut {
             .descriptor
             .options
             .iter()
-            .find(|(key, value)| -> bool { key == "port" })
+            .find(|(key, _value)| -> bool { key == "port" })
             .unwrap();
 
         let stream = Self::new_stream(SocketAddr::new(
@@ -176,12 +173,11 @@ impl Put for TcpPut {
 
         Ok(Self {
             stream,
-            outbound_buffer: io::Cursor::new(Vec::new()),
             deframer: Default::default(),
         })
     }
 
-    fn progress(&mut self) -> Result<(), Error> {
+    fn progress(&mut self, _agent_name: &AgentName) -> Result<(), Error> {
         Ok(())
     }
 
@@ -228,24 +224,17 @@ impl Put for TcpPut {
 #[cfg(test)]
 mod tests {
     use std::{
-        collections::HashMap,
         ffi::OsStr,
         io::{stderr, Read, Write},
-        os::unix::io::RawFd,
         process::{Child, Command, Stdio},
-        thread,
-        time::Duration,
     };
 
-    use libafl::executors::forkserver::ConfigTarget;
     use tempfile::{tempdir, TempDir};
 
     use crate::{
-        agent::AgentName,
         put::PutDescriptor,
-        put_registry::{current_put, TCP},
-        tls::seeds::{seed_client_attacker_full, seed_session_resumption_dhe_full},
-        trace::TraceContext,
+        put_registry::TCP,
+        tls::seeds::{seed_client_attacker_full, seed_session_resumption_dhe_full, SeedHelper},
     };
 
     struct OpenSSLServer {
@@ -342,13 +331,8 @@ mod tests {
             ..PutDescriptor::default()
         };
 
-        let mut ctx = TraceContext::new();
-        let initial_server = AgentName::first();
-        let server = initial_server.next();
-        let trace =
-            seed_session_resumption_dhe_full(initial_server, server, current_put(), current_put());
-
-        trace.execute(&mut ctx).unwrap();
+        let trace = seed_session_resumption_dhe_full.build_trace_with_put(put);
+        trace.execute_default();
     }
 
     #[test]
@@ -362,10 +346,7 @@ mod tests {
             ..PutDescriptor::default()
         };
 
-        let mut ctx = TraceContext::new();
-        let server = AgentName::first();
-        let (trace, ..) = seed_client_attacker_full(server, put);
-
-        trace.execute(&mut ctx).unwrap();
+        let trace = seed_client_attacker_full.build_trace_with_put(put);
+        trace.execute_default();
     }
 }

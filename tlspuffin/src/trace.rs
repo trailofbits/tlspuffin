@@ -248,7 +248,7 @@ impl ByAgentClaimList {
             .iter()
             .cloned()
             .rev()
-            .filter(|(name, claim)| agent_name == *name)
+            .filter(|(name, _claim)| agent_name == *name)
             .collect::<Vec<_>>();
         Self {
             claims: filtered.into(),
@@ -257,7 +257,7 @@ impl ByAgentClaimList {
 
     /// finds the last claim matching `type`
     pub fn find_last_claim(&self, typ: ClaimType) -> Option<&(AgentName, Claim)> {
-        self.claims.iter().find(|(name, claim)| claim.typ == typ)
+        self.claims.iter().find(|(_name, claim)| claim.typ == typ)
     }
 }
 
@@ -367,7 +367,7 @@ impl TraceContext {
 
     pub fn next_state(&mut self, agent_name: AgentName) -> Result<(), Error> {
         let agent = self.find_agent_mut(agent_name)?;
-        agent.stream.progress()
+        agent.stream.progress(&agent_name)
     }
 
     /// Takes data from the outbound [`Channel`] of the [`Agent`] referenced by the parameter "agent".
@@ -417,6 +417,16 @@ impl TraceContext {
             agent.reset()?;
         }
         Ok(())
+    }
+
+    pub fn agents_successful(&self) -> bool {
+        for agent in &self.agents {
+            if !agent.stream.is_state_successful() {
+                return false;
+            }
+        }
+
+        true
     }
 }
 
@@ -494,6 +504,12 @@ impl Trace {
         }
 
         Ok(())
+    }
+
+    pub fn execute_default(&self) -> TraceContext {
+        let mut ctx = TraceContext::new();
+        self.execute(&mut ctx).unwrap();
+        ctx
     }
 }
 

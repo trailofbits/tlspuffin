@@ -3,12 +3,12 @@
 //! - [`progress`] makes a state progress (interacting with the buffers)
 //!
 //! And specific implementations of PUT for the different PUTs.
-use std::{cell::RefCell, collections::HashMap, fmt::Debug, hash::Hash, rc::Rc};
+use std::{cell::RefCell, fmt::Debug, hash::Hash, rc::Rc};
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    agent::{AgentDescriptor, AgentName, TLSVersion},
+    agent::{AgentName, TLSVersion},
     error::Error,
     io::Stream,
     put_registry::DUMMY_PUT,
@@ -46,7 +46,7 @@ pub trait Put: Stream + Drop + 'static {
     where
         Self: Sized;
     /// Process incoming buffer, internal progress, can fill in output buffer
-    fn progress(&mut self) -> Result<(), Error>;
+    fn progress(&mut self, agent_name: &AgentName) -> Result<(), Error>;
     /// In-place reset of the state
     fn reset(&mut self) -> Result<(), Error>;
     /// Register a new claim for agent_name

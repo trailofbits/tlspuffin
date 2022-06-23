@@ -14,14 +14,62 @@ use rustls::{
 use crate::{
     agent::{AgentDescriptor, AgentName, TLSVersion},
     algebra::Term,
-    put::{PutDescriptor, PutName},
-    put_registry::current_put,
+    put::PutDescriptor,
+    put_registry::{current_put, PUT_REGISTRY},
     term,
     tls::fn_impl::*,
     trace::{
         Action, InputAction, OutputAction, Step, TlsMessageType, TlsMessageType::Handshake, Trace,
+        TraceContext,
     },
 };
+
+pub trait SeedHelper<A>: SeedExecutor<A> {
+    fn build_trace_with_put(self, put: PutDescriptor) -> Trace;
+    fn build_trace(self) -> Trace;
+}
+
+pub trait SeedExecutor<A> {
+    fn execute_trace(self) -> TraceContext;
+}
+
+impl<A, H: SeedHelper<A>> SeedExecutor<A> for H {
+    fn execute_trace(self) -> TraceContext {
+        PUT_REGISTRY.make_deterministic();
+        self.build_trace().execute_default()
+    }
+}
+
+impl<F> SeedHelper<(AgentName, AgentName)> for F
+where
+    F: Fn(AgentName, AgentName, PutDescriptor, PutDescriptor) -> Trace,
+{
+    fn build_trace_with_put(self, descriptor: PutDescriptor) -> Trace {
+        let agent_a = AgentName::first();
+        let agent_b = agent_a.next();
+
+        (self)(agent_a, agent_b, descriptor.clone(), descriptor)
+    }
+
+    fn build_trace(self) -> Trace {
+        self.build_trace_with_put(current_put())
+    }
+}
+
+impl<F> SeedHelper<AgentName> for F
+where
+    F: Fn(AgentName, PutDescriptor) -> Trace,
+{
+    fn build_trace_with_put(self, descriptor: PutDescriptor) -> Trace {
+        let agent_a = AgentName::first();
+
+        (self)(agent_a, descriptor)
+    }
+
+    fn build_trace(self) -> Trace {
+        self.build_trace_with_put(current_put())
+    }
+}
 
 pub fn seed_successful(
     client: AgentName,
@@ -1225,8 +1273,12 @@ pub fn seed_session_resumption_ke(
     trace
 }
 
+pub fn seed_client_attacker_full(server: AgentName, put_descriptor: PutDescriptor) -> Trace {
+    _seed_client_attacker_full(server, put_descriptor).0
+}
+
 /// Seed which contains the whole transcript in the tree. This is rather huge >300 symbols
-pub fn seed_client_attacker_full(
+pub fn _seed_client_attacker_full(
     server: AgentName,
     put_descriptor: PutDescriptor,
 ) -> (Trace, Term, Term, Term) {
@@ -1437,7 +1489,7 @@ pub fn seed_session_resumption_dhe_full(
         server_hello_transcript,
         server_finished_transcript,
         client_finished_transcript,
-    ) = seed_client_attacker_full(initial_server, initial_server_put);
+    ) = _seed_client_attacker_full(initial_server, initial_server_put);
 
     let new_ticket_message = term! {
         fn_decrypt_application(
@@ -1619,42 +1671,28 @@ pub fn seed_session_resumption_dhe_full(
 }
 
 pub fn create_corpus() -> [(Trace, &'static str); 8] {
-    let agent_a = AgentName::first();
-    let agent_b = agent_a.next();
-
-    let put = current_put();
-
     [
+        (seed_successful.build_trace(), "seed_successful"),
         (
-            seed_successful(agent_a, agent_b, current_put(), current_put()),
-            "seed_successful",
-        ),
-        (
-            seed_successful_with_ccs(agent_a, agent_b, current_put(), current_put()),
+            seed_successful_with_ccs.build_trace(),
             "seed_successful_with_ccs",
         ),
         (
-            seed_successful_with_tickets(agent_a, agent_b, current_put(), current_put()),
+            seed_successful_with_tickets.build_trace(),
             "seed_successful_with_tickets",
         ),
+        (seed_successful12.build_trace(), "seed_successful12"),
+        (seed_client_attacker.build_trace(), "seed_client_attacker"),
         (
-            seed_successful12(agent_a, agent_b, current_put(), current_put()),
-            "seed_successful12",
-        ),
-        (
-            seed_client_attacker(agent_a, current_put()),
-            "seed_client_attacker",
-        ),
-        (
-            seed_client_attacker12(agent_a, current_put()),
+            seed_client_attacker12.build_trace(),
             "seed_client_attacker12",
         ),
         (
-            seed_session_resumption_dhe(agent_a, agent_b, current_put(), current_put()),
+            seed_session_resumption_dhe.build_trace(),
             "seed_session_resumption_dhe",
         ),
         (
-            seed_session_resumption_ke(agent_a, agent_b, current_put(), current_put()),
+            seed_session_resumption_ke.build_trace(),
             "seed_session_resumption_ke",
         ),
     ]
@@ -1674,12 +1712,11 @@ pub mod tests {
     };
     use test_log::test;
 
-    use super::*;
+    use super::{SeedHelper, *};
     use crate::{
         agent::AgentName,
-        put::PutName,
         put_registry::{CURRENT_PUT_NAME, PUT_REGISTRY},
-        trace::{Action, TraceContext},
+        trace::Action,
     };
 
     fn expect_crash<R>(mut func: R)
@@ -1718,13 +1755,7 @@ pub mod tests {
     #[test]
     fn test_seed_hearbeat() {
         expect_crash(|| {
-            PUT_REGISTRY.make_deterministic();
-            let mut ctx = TraceContext::new();
-            let client = AgentName::first();
-            let server = client.next();
-            let trace = seed_heartbleed(client, server, current_put());
-
-            trace.execute(&mut ctx).unwrap();
+            seed_heartbleed.execute_trace();
         })
     }
 
@@ -1739,112 +1770,57 @@ pub mod tests {
             return;
         }
         expect_crash(|| {
-            PUT_REGISTRY.make_deterministic();
-            let mut ctx = TraceContext::new();
-            let server = AgentName::first();
-            let trace = seed_cve_2021_3449(server, current_put());
-
-            trace.execute(&mut ctx).unwrap();
+            seed_cve_2021_3449.execute_trace();
         });
     }
 
     #[test]
     fn test_seed_client_attacker12() {
-        PUT_REGISTRY.make_deterministic();
-        let mut ctx = TraceContext::new();
-        let server = AgentName::first();
-        let trace = seed_client_attacker12(server, current_put());
-
-        trace.execute(&mut ctx).unwrap();
-
-        assert!(ctx.find_agent(server).unwrap().stream.is_state_successful());
+        let ctx = seed_client_attacker12.execute_trace();
+        assert!(ctx.agents_successful());
     }
 
     #[cfg(feature = "tls13")] // require version which supports TLS 1.3
     #[cfg(feature = "transcript-extraction")] // this depends on extracted transcripts -> claims are required
     #[test]
     fn test_seed_client_attacker() {
-        PUT_REGISTRY.make_deterministic();
-        let mut ctx = TraceContext::new();
-        let server = AgentName::first();
-        let trace = seed_client_attacker(server, current_put());
-
-        trace.execute(&mut ctx).unwrap();
-
-        assert!(ctx.find_agent(server).unwrap().stream.is_state_successful());
+        let ctx = seed_client_attacker.execute_trace();
+        assert!(ctx.agents_successful());
     }
 
     #[cfg(feature = "tls13")] // require version which supports TLS 1.3
     #[test]
     fn test_seed_client_attacker_full() {
-        PUT_REGISTRY.make_deterministic();
-        let mut ctx = TraceContext::new();
-        let server = AgentName::first();
-        let (trace, ..) = seed_client_attacker_full(server, current_put());
-
-        trace.execute(&mut ctx).unwrap();
-
-        assert!(ctx.find_agent(server).unwrap().stream.is_state_successful())
+        let ctx = seed_client_attacker_full.execute_trace();
+        assert!(ctx.agents_successful());
     }
 
     #[cfg(all(feature = "tls13", feature = "session-resumption"))]
     #[test]
     fn test_seed_session_resumption_dhe() {
-        PUT_REGISTRY.make_deterministic();
-        let mut ctx = TraceContext::new();
-        let initial_server = AgentName::first();
-        let server = initial_server.next();
-        let trace =
-            seed_session_resumption_dhe(initial_server, server, current_put(), current_put());
-
-        trace.execute(&mut ctx).unwrap();
-
-        assert!(ctx.find_agent(server).unwrap().stream.is_state_successful())
+        let ctx = seed_session_resumption_dhe.execute_trace();
+        assert!(ctx.agents_successful());
     }
 
     #[cfg(all(feature = "tls13", feature = "session-resumption"))]
     #[test]
     fn test_seed_session_resumption_dhe_full() {
-        PUT_REGISTRY.make_deterministic();
-        let mut ctx = TraceContext::new();
-        let initial_server = AgentName::first();
-        let server = initial_server.next();
-        let trace =
-            seed_session_resumption_dhe_full(initial_server, server, current_put(), current_put());
-
-        trace.execute(&mut ctx).unwrap();
-
-        assert!(ctx.find_agent(server).unwrap().stream.is_state_successful())
+        let ctx = seed_session_resumption_dhe_full.execute_trace();
+        assert!(ctx.agents_successful());
     }
 
     #[cfg(all(feature = "tls13", feature = "session-resumption"))]
     #[test]
     fn test_seed_session_resumption_ke() {
-        PUT_REGISTRY.make_deterministic();
-        let mut ctx = TraceContext::new();
-        let initial_server = AgentName::first();
-        let server = initial_server.next();
-        let trace =
-            seed_session_resumption_ke(initial_server, server, current_put(), current_put());
-
-        trace.execute(&mut ctx).unwrap();
-
-        assert!(ctx.find_agent(server).unwrap().stream.is_state_successful())
+        let ctx = seed_session_resumption_ke.execute_trace();
+        assert!(ctx.agents_successful());
     }
 
     #[cfg(feature = "tls13")] // require version which supports TLS 1.3
     #[test]
     fn test_seed_successful() {
-        PUT_REGISTRY.make_deterministic();
-        let mut ctx = TraceContext::new();
-        let client = AgentName::first();
-        let server = client.next();
-        let trace = seed_successful(client, server, current_put(), current_put());
-
-        trace.execute(&mut ctx).unwrap();
-
-        assert!(ctx.find_agent(client).unwrap().stream.is_state_successful());
-        assert!(ctx.find_agent(server).unwrap().stream.is_state_successful());
+        let ctx = seed_successful.execute_trace();
+        assert!(ctx.agents_successful());
     }
 
     #[cfg(feature = "tls13")] // require version which supports TLS 1.3
@@ -1854,32 +1830,15 @@ pub mod tests {
     // expected = "decryption failed or bad record mac"  // in case MITM attack did fail
     #[should_panic]
     fn test_seed_successful_mitm() {
-        PUT_REGISTRY.make_deterministic();
-        let mut ctx = TraceContext::new();
-        let client = AgentName::first();
-        let server = client.next();
-        let trace = seed_successful_mitm(client, server, current_put(), current_put());
-        //println!("{}", trace);
-
-        trace.execute(&mut ctx).unwrap();
-
-        assert!(ctx.find_agent(client).unwrap().stream.is_state_successful());
-        assert!(ctx.find_agent(server).unwrap().stream.is_state_successful());
+        let ctx = seed_successful_mitm.execute_trace();
+        assert!(ctx.agents_successful());
     }
 
     #[cfg(feature = "tls13")] // require version which supports TLS 1.3
     #[test]
     fn test_seed_successful_with_ccs() {
-        PUT_REGISTRY.make_deterministic();
-        let mut ctx = TraceContext::new();
-        let client = AgentName::first();
-        let server = client.next();
-        let trace = seed_successful_with_ccs(client, server, current_put(), current_put());
-
-        trace.execute(&mut ctx).unwrap();
-
-        assert!(ctx.find_agent(client).unwrap().stream.is_state_successful());
-        assert!(ctx.find_agent(server).unwrap().stream.is_state_successful());
+        let ctx = seed_successful_with_ccs.execute_trace();
+        assert!(ctx.agents_successful());
     }
 
     // require version which supports TLS 1.3 and session-resumption (else no tickets are sent)
@@ -1887,29 +1846,14 @@ pub mod tests {
     #[cfg(all(feature = "tls13", feature = "session-resumption"))] // FIXME expression is a hack
     #[test]
     fn test_seed_successful_with_tickets() {
-        PUT_REGISTRY.make_deterministic();
-        let mut ctx = TraceContext::new();
-        let client = AgentName::first();
-        let server = client.next();
-        let trace = seed_successful_with_tickets(client, server, current_put(), current_put());
-
-        trace.execute(&mut ctx).unwrap();
-
-        assert!(ctx.find_agent(client).unwrap().stream.is_state_successful());
-        assert!(ctx.find_agent(server).unwrap().stream.is_state_successful());
+        let ctx = seed_successful_with_tickets.execute_trace();
+        assert!(ctx.agents_successful());
     }
 
     #[test]
     fn test_seed_successful12() {
-        let mut ctx = TraceContext::new();
-        let client = AgentName::first();
-        let server = client.next();
-        let trace = seed_successful12(client, server, current_put(), current_put());
-
-        trace.execute(&mut ctx).unwrap();
-
-        assert!(ctx.find_agent(client).unwrap().stream.is_state_successful());
-        assert!(ctx.find_agent(server).unwrap().stream.is_state_successful());
+        let ctx = seed_successful12.execute_trace();
+        assert!(ctx.agents_successful());
     }
 
     // Vulnerable up until OpenSSL 1.0.1j
@@ -1918,29 +1862,21 @@ pub mod tests {
     #[ignore] // We can not check for this vulnerability right now
     fn test_seed_freak() {
         expect_crash(|| {
-            PUT_REGISTRY.make_deterministic();
-            //println!("{}", openssl_version());
-
-            let mut ctx = TraceContext::new();
-            let client = AgentName::first();
-            let server = client.next();
-            let trace = seed_freak(client, server, current_put());
-
-            trace.execute(&mut ctx).unwrap();
+            seed_freak.execute_trace();
         });
     }
 
     #[test]
     fn test_term_sizes() {
         let client = AgentName::first();
-        let server = client.next();
+        let _server = client.next();
 
         for trace in [
-            seed_successful12(client, server, current_put(), current_put()),
-            seed_successful(client, server, current_put(), current_put()),
-            seed_client_attacker12(server, current_put()),
-            seed_cve_2021_3449(server, current_put()),
-            seed_client_attacker(server, current_put()),
+            seed_successful12.build_trace(),
+            seed_successful.build_trace(),
+            seed_client_attacker12.build_trace(),
+            seed_cve_2021_3449.build_trace(),
+            seed_client_attacker.build_trace(),
         ] {
             for step in &trace.steps {
                 match &step.action {
@@ -1959,17 +1895,13 @@ pub mod tests {
 
         use crate::{
             agent::AgentName,
-            put::PutName,
             tls::seeds::*,
             trace::{Trace, TraceContext},
         };
 
         #[test]
         fn test_serialisation_seed_seed_session_resumption_dhe_json() {
-            let initial_server = AgentName::first();
-            let server = initial_server.next();
-            let trace =
-                seed_session_resumption_dhe(initial_server, server, current_put(), current_put());
+            let trace = seed_session_resumption_dhe.build_trace();
 
             let serialized1 = serde_json::to_string_pretty(&trace).unwrap();
 
@@ -1981,10 +1913,7 @@ pub mod tests {
 
         #[test]
         fn test_serialisation_seed_seed_session_resumption_ke_json() {
-            let initial_server = AgentName::first();
-            let server = initial_server.next();
-            let trace =
-                seed_session_resumption_ke(initial_server, server, current_put(), current_put());
+            let trace = seed_session_resumption_ke.build_trace();
 
             let serialized1 = serde_json::to_string_pretty(&trace).unwrap();
 
@@ -1996,8 +1925,7 @@ pub mod tests {
 
         #[test]
         fn test_serialisation_seed_client_attacker12_json() {
-            let server = AgentName::first();
-            let trace = seed_client_attacker12(server, current_put());
+            let trace = seed_client_attacker12.build_trace();
 
             let serialized1 = serde_json::to_string_pretty(&trace).unwrap();
 
@@ -2024,10 +1952,7 @@ pub mod tests {
 
         #[test]
         fn test_serialisation_seed_successful_postcard() {
-            let _ctx = TraceContext::new();
-            let client = AgentName::first();
-            let server = client.next();
-            let trace = seed_successful(client, server, current_put(), current_put());
+            let trace = seed_successful.build_trace();
 
             let serialized1 = postcard::to_allocvec(&trace).unwrap();
 
@@ -2039,10 +1964,7 @@ pub mod tests {
 
         #[test]
         fn test_serialisation_seed_successful12_json() {
-            let _ctx = TraceContext::new();
-            let client = AgentName::first();
-            let server = client.next();
-            let trace = seed_successful12(client, server, current_put(), current_put());
+            let trace = seed_successful12.build_trace();
 
             let serialized1 = serde_json::to_string_pretty(&trace).unwrap();
 
@@ -2054,10 +1976,7 @@ pub mod tests {
 
         #[test]
         fn test_serialisation_seed_heartbleed() {
-            let _ctx = TraceContext::new();
-            let client = AgentName::first();
-            let server = client.next();
-            let trace = seed_heartbleed(client, server, current_put(), current_put());
+            let trace = seed_heartbleed.build_trace();
 
             let serialized1 = serde_json::to_string_pretty(&trace).unwrap();
 

@@ -115,7 +115,7 @@ impl Put for OpenSSL {
         Ok(openssl)
     }
 
-    fn progress(&mut self) -> Result<(), Error> {
+    fn progress(&mut self, _agent_name: &AgentName) -> Result<(), Error> {
         if self.is_state_successful() {
             // Trigger another read
             let mut vec: Vec<u8> = Vec::from([1; 128]);
