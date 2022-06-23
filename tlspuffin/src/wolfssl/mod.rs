@@ -215,16 +215,16 @@ impl Put for WolfSSL {
         self.stream.state_string_long()
     }
 
+    fn is_state_successful(&self) -> bool {
+        self.stream.is_handshake_done()
+    }
+
     fn version() -> &'static str {
         unsafe { version() }
     }
 
     fn make_deterministic() {
         // TODO
-    }
-
-    fn is_state_successful(&self) -> bool {
-        self.stream.is_handshake_done()
     }
 }
 
