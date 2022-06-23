@@ -32,9 +32,9 @@ use log4rs::Handle;
 use super::harness;
 use crate::{
     fuzzer::{
-        monitor::PuffinMonitor,
         mutations::{trace_mutations, util::TermConstraints},
         stages::{PuffinMutationalStage, PuffinScheduledMutator},
+        stats_monitor::StatsMonitor,
         stats_observer::StatsStage,
     },
     log::create_file_config,
@@ -415,7 +415,7 @@ where
         let (feedback, observers) = {
             let time_observer = TimeObserver::new("time");
             let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", unsafe {
-                &mut super::EDGES_MAP[0..super::MAX_EDGES_NUM]
+                &mut super::sanitizer::EDGES_MAP[0..super::sanitizer::MAX_EDGES_NUM]
             }));
             let feedback = feedback_or!(
                 // New maximization map feedback linked to the edges observer and the feedback state
@@ -497,7 +497,7 @@ pub fn start(config: FuzzerConfig, log_handle: Handle) {
             .shmem_provider(sh_mem_provider)
             .configuration(configuration)
             .monitor(
-                PuffinMonitor::new(
+                StatsMonitor::new(
                     |s| {
                         info!("{}", s);
                     },

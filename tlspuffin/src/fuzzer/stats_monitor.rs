@@ -19,7 +19,7 @@ use serde_json::Serializer as JSONSerializer;
 use crate::fuzzer::stats_observer::{RuntimeStats, STATS};
 
 /// Tracking stats during fuzzing and display both per-client and cumulative info.
-pub struct PuffinMonitor<F>
+pub struct StatsMonitor<F>
 where
     F: FnMut(String),
 {
@@ -31,7 +31,7 @@ where
     serializer: JSONSerializer<BufWriter<File>>,
 }
 
-impl<F> Clone for PuffinMonitor<F>
+impl<F> Clone for StatsMonitor<F>
 where
     F: FnMut(String) + Clone,
 {
@@ -52,7 +52,7 @@ where
     }
 }
 
-impl<F> PuffinMonitor<F>
+impl<F> StatsMonitor<F>
 where
     F: FnMut(String),
 {
@@ -374,7 +374,7 @@ impl TraceStatistics {
     }
 }
 
-impl<F> Monitor for PuffinMonitor<F>
+impl<F> Monitor for StatsMonitor<F>
 where
     F: FnMut(String),
 {
@@ -405,7 +405,7 @@ where
     }
 }
 
-impl<F> PuffinMonitor<F>
+impl<F> StatsMonitor<F>
 where
     F: FnMut(String),
 {
