@@ -24,9 +24,10 @@ use libafl::{
     observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler, Scheduler},
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasNamedMetadata, StdState},
-    Error,
+    Error, Evaluator,
 };
-use log::info;
+use log::{info, warn};
+use log4rs::Handle;
 
 use super::harness;
 use crate::{
@@ -36,7 +37,9 @@ use crate::{
         stages::{PuffinMutationalStage, PuffinScheduledMutator},
         stats_observer::StatsStage,
     },
+    log::create_file_config,
     put_registry::PUT_REGISTRY,
+    tls::seeds::create_corpus,
     trace::Trace,
 };
 
@@ -309,21 +312,31 @@ where
         );
 
         // In case the corpus is empty (on first run), reset
-        if state.corpus().count() < 1 {
-            state
-                .load_initial_inputs(
-                    &mut fuzzer,
-                    &mut executor,
-                    &mut self.event_manager,
-                    &[initial_corpus_dir.clone()],
-                )
-                .unwrap_or_else(|err| {
-                    panic!(
-                        "Failed to load initial corpus at {:?}: {}",
-                        &initial_corpus_dir, err
+        if state.corpus().is_empty() {
+            if initial_corpus_dir.exists() {
+                state
+                    .load_initial_inputs(
+                        &mut fuzzer,
+                        &mut executor,
+                        &mut self.event_manager,
+                        &[initial_corpus_dir.clone()],
                     )
-                });
-            info!("We imported {} inputs from disk.", state.corpus().count());
+                    .unwrap_or_else(|err| {
+                        panic!(
+                            "Failed to load initial corpus at {:?}: {}",
+                            &initial_corpus_dir, err
+                        )
+                    });
+                info!("Imported {} inputs from disk.", state.corpus().count());
+            } else {
+                warn!("Initial seed corpus not found. Using embedded seeds.");
+
+                for (seed, _) in create_corpus() {
+                    fuzzer
+                        .add_input(&mut state, &mut executor, &mut self.event_manager, seed)
+                        .expect("Failed to add input");
+                }
+            }
         }
 
         if let Some(max_iters) = max_iters {
@@ -428,7 +441,7 @@ where
 }
 
 /// Starts the fuzzing loop
-pub fn start(config: FuzzerConfig) {
+pub fn start(config: FuzzerConfig, log_handle: Handle) {
     info!("Running on {} cores", &config.core_definition);
 
     let mut run_client =
@@ -437,6 +450,11 @@ pub fn start(config: FuzzerConfig) {
          _unknown: usize|
          -> Result<(), Error> {
             PUT_REGISTRY.make_deterministic();
+
+            log_handle
+                .clone()
+                .set_config(create_file_config(&PathBuf::from("tlspuffin-log.json")));
+
             let seed = config
                 .static_seed
                 .unwrap_or(event_manager.mgr_id().id as u64);
@@ -482,7 +500,7 @@ pub fn start(config: FuzzerConfig) {
             .cores(&cores)
             .broker_port(config.broker_port)
             //todo where should we log the output of the harness?
-            /*.stdout_file(Some("/dev/null"))*/
+            //.stdout_file(Some("/dev/null"))
             .build()
             .launch(),
     };
