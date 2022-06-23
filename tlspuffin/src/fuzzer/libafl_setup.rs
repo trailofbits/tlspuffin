@@ -35,7 +35,7 @@ use crate::{
         mutations::{trace_mutations, util::TermConstraints},
         stages::{PuffinMutationalStage, PuffinScheduledMutator},
         stats_monitor::StatsMonitor,
-        stats_observer::StatsStage,
+        stats_stage::StatsStage,
     },
     log::create_file_config,
     put_registry::PUT_REGISTRY,

@@ -16,7 +16,7 @@ use libafl::{
 use serde::Serialize;
 use serde_json::Serializer as JSONSerializer;
 
-use crate::fuzzer::stats_observer::{RuntimeStats, STATS};
+use crate::fuzzer::stats_stage::{RuntimeStats, STATS};
 
 /// Tracking stats during fuzzing and display both per-client and cumulative info.
 pub struct StatsMonitor<F>

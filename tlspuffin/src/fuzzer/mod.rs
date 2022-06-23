@@ -11,7 +11,7 @@ mod macros;
 mod sanitizer;
 mod stages;
 mod stats_monitor;
-mod stats_observer;
+mod stats_stage;
 mod term_zoo;
 // Public for benchmarks
 pub mod mutations;
