@@ -40,6 +40,16 @@ pub struct PutConfig {
     pub claims: Rc<RefCell<ClaimList>>,
 }
 
+impl PutConfig {
+    pub fn get_option(&self, key: &str) -> Option<&str> {
+        self.descriptor
+            .options
+            .iter()
+            .find(|(found_key, _value)| -> bool { found_key == key })
+            .map(|(_key, value)| value.as_str())
+    }
+}
+
 pub trait Put: Stream + Drop + 'static {
     /// Create a new agent state for the PUT + set up buffers/BIOs
     fn new(agent_name: AgentName, config: PutConfig) -> Result<Self, Error>

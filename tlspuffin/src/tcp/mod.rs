@@ -159,17 +159,13 @@ impl Put for TcpPut {
     where
         Self: Sized,
     {
-        let (_, value) = config
-            .descriptor
-            .options
-            .iter()
-            .find(|(key, _value)| -> bool { key == "port" })
-            .unwrap();
+        let host = config.get_option("host").unwrap_or("127.0.0.1");
+        let port = config
+            .get_option("port")
+            .and_then(|value| u16::from_str(value).ok())
+            .expect("Failed to parse port option");
 
-        let stream = Self::new_stream(SocketAddr::new(
-            IpAddr::from_str("127.0.0.1")?,
-            u16::from_str(value).unwrap(),
-        ))?;
+        let stream = Self::new_stream(SocketAddr::new(IpAddr::from_str(host)?, port))?;
 
         Ok(Self {
             stream,
