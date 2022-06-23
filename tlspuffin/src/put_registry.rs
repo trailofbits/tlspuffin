@@ -60,7 +60,7 @@ pub const CURRENT_PUT_NAME: PutName = {
         } else if #[cfg(feature = "wolfssl-binding")] {
             WOLFSSL520
         } else {
-            TCP
+            DUMMY_PUT
         }
     }
 };
