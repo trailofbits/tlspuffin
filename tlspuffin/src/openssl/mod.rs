@@ -18,6 +18,7 @@ use crate::{
     trace::ClaimList,
 };
 
+#[cfg(feature = "deterministic")]
 mod deterministic;
 mod util;
 
@@ -165,7 +166,7 @@ impl Put for OpenSSL {
     }
 
     fn make_deterministic() {
-        #[cfg(feature = "openssl111")]
+        #[cfg(all(feature = "deterministic", feature = "openssl111"))]
         deterministic::set_openssl_deterministic();
         #[cfg(not(feature = "openssl111"))]
         log::warn!("Unable to make PUT determinisitic!");
