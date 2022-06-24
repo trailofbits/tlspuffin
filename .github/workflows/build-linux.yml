@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        name: ["openssl111", "openssl101f", "openssl102u", "libressl", "wolfssl520", "no_default_features"]
+        name: ["openssl111", "openssl101f", "openssl102u", "libressl", "wolfssl510", "wolfssl520", "wolfssl530", "no_default_features"]
         include:
           - name: openssl111
             features: openssl111
@@ -26,8 +26,12 @@ jobs:
             clean-crates: openssl-sys
           - name: libressl
             features: libressl
+          - name: wolfssl510
+            features: wolfssl510
           - name: wolfssl520
             features: wolfssl520
+          - name: wolfssl530
+            features: wolfssl530
           - name: no_default_features
             features: ""
             cargo-flags: "--no-default-features"
