@@ -2,6 +2,7 @@
 
 use std::{
     cell::RefCell,
+    ffi::{CStr, CString},
     io::{ErrorKind, Read, Write},
     rc::Rc,
 };
@@ -42,8 +43,8 @@ mod x509;
 pub fn new_wolfssl_factory() -> Box<dyn Factory> {
     struct WolfSSLFactory;
     impl Factory for WolfSSLFactory {
-        fn create(&self, agent_name: AgentName, config: PutConfig) -> Box<dyn Put> {
-            Box::new(WolfSSL::new(agent_name, config).unwrap())
+        fn create(&self, agent_name: AgentName, config: PutConfig) -> Result<Box<dyn Put>, Error> {
+            Ok(Box::new(WolfSSL::new(agent_name, config)?))
         }
 
         fn put_name(&self) -> PutName {
@@ -264,6 +265,12 @@ impl WolfSSL {
         let pkey = PKey::from_rsa(rsa)?;
         ctx.set_private_key(pkey.as_ref())?;
 
+        unsafe {
+            //wolfssl_sys::wolfSSL_CTX_set_psk_server_callback();
+            let string = CString::new("test").unwrap();
+            wolfssl_sys::wolfSSL_CTX_use_psk_identity_hint(ctx.as_ptr(), string.as_ptr());
+        }
+
         // Callbacks for experiements
         //wolf::wolfSSL_CTX_set_keylog_callback(ctx, Some(SSL_keylog));
         //wolf::wolfSSL_CTX_set_info_callback(ctx, Some(SSL_info));
@@ -271,6 +278,7 @@ impl WolfSSL {
         //wolf::wolfSSL_set_tls13_secret_cb(ssl.as_ptr(), Some(SSL_keylog13), ptr::null_mut());
 
         // We expect two tickets like in OpenSSL
+        #[cfg(not(feature = "wolfssl440"))]
         ctx.set_num_tickets(2)?;
 
         //// SSL pointer builder

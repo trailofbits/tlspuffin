@@ -17,6 +17,7 @@ use wolfssl_sys as wolf;
 
 use crate::{
     agent::TLSVersion,
+    static_certs::PRIVATE_KEY,
     wolfssl::{
         bio,
         callbacks::{msg_callback, ExtraUserDataRegistry, UserData},
@@ -153,9 +154,22 @@ impl SslContextRef {
         T: HasPrivate,
     {
         unsafe {
-            cvt(wolf::wolfSSL_CTX_use_PrivateKey(
+            /*cvt(wolf::wolfSSL_CTX_use_PrivateKey(
                 self.as_ptr(),
                 key.as_ptr(),
+            ))
+            .map(|_| ())*/
+
+            let bytes = PRIVATE_KEY.as_bytes();
+
+            let pkey = (*key.as_ptr());
+            cvt(wolf::wolfSSL_CTX_use_PrivateKey_buffer(
+                self.as_ptr(),
+                bytes.as_ptr() as *const u8,
+                bytes.len() as i64,
+                //pkey.pkey.ptr as *const u8,
+                //pkey.pkey_sz as i64,
+                wolf::WOLFSSL_FILETYPE_PEM,
             ))
             .map(|_| ())
         }
@@ -172,6 +186,7 @@ impl SslContextRef {
         }
     }
 
+    #[cfg(not(feature = "wolfssl440"))]
     pub fn set_num_tickets(&mut self, n: u64) -> Result<(), ErrorStack> {
         unsafe { cvt(wolf::wolfSSL_CTX_set_num_tickets(self.as_ptr(), n)).map(|_| ()) }
     }
@@ -181,13 +196,12 @@ impl SslContextRef {
 pub fn init(debug: bool) {
     // explicitly initialize to work around https://github.com/openssl/openssl/issues/3505
     static INIT: Once = Once::new();
-    let init_options = wolf::OPENSSL_INIT_LOAD_SSL_STRINGS;
 
     INIT.call_once(|| unsafe {
         if debug {
             wolf::wolfSSL_Debugging_ON();
         }
-        wolf::wolfSSL_OPENSSL_init_ssl(init_options as u64, ptr::null_mut());
+        wolf::wolfSSL_Init();
     })
 }
 
@@ -327,6 +341,7 @@ impl SslRef {
                 "SERVER_ENCRYPTED_EXTENSIONS_COMPLETE"
             }
             wolf::states_SERVER_CERT_COMPLETE => "SERVER_CERT_COMPLETE",
+            #[cfg(not(feature = "wolfssl440"))]
             wolf::states_SERVER_CERT_VERIFY_COMPLETE => "SERVER_CERT_VERIFY_COMPLETE",
             wolf::states_SERVER_KEYEXCHANGE_COMPLETE => "SERVER_KEYEXCHANGE_COMPLETE",
             wolf::states_SERVER_HELLODONE_COMPLETE => "SERVER_HELLODONE_COMPLETE",

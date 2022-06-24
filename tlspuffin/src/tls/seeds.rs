@@ -429,6 +429,8 @@ pub fn seed_successful12(
                 }),
             },
             // Ticket, Server -> Client
+            // FIXME: verify: wolfSSL 4.4.0 does not support tickets in TLS 1.2
+            #[cfg(not(feature = "wolfssl440"))]
             Step {
                 agent: client,
                 action: Action::Input(InputAction {
@@ -453,9 +455,16 @@ pub fn seed_successful12(
             Step {
                 agent: client,
                 action: Action::Input(InputAction {
+                    #[cfg(not(feature = "wolfssl440"))]
                     recipe: term! {
                         fn_opaque_message(
                             ((server, 6)[None])
+                        )
+                    },
+                    #[cfg(feature = "wolfssl440")]
+                    recipe: term! {
+                        fn_opaque_message(
+                            ((server, 5)[None])
                         )
                     },
                 }),
@@ -523,7 +532,8 @@ pub fn seed_successful_with_tickets(
             },
         }),
     });
-    // Ticket
+    // Ticket (wolfSSL 4.4.0 only sends a single ticket)
+    #[cfg(not(feature = "wolfssl440"))]
     trace.steps.push(Step {
         agent: client,
         action: Action::Input(InputAction {

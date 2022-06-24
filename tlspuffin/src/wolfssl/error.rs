@@ -100,6 +100,7 @@ impl Error {
     }
 
     /// Returns the name of the library reporting the error, if available.
+    #[cfg(not(feature = "wolfssl440"))]
     pub fn library(&self) -> Option<&'static str> {
         unsafe {
             let cstr = wolfssl_sys::wolfSSL_ERR_lib_error_string(self.code);
@@ -142,6 +143,7 @@ impl fmt::Debug for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut builder = fmt.debug_struct("Error");
         builder.field("code", &self.code());
+        #[cfg(not(feature = "wolfssl440"))]
         if let Some(library) = self.library() {
             builder.field("library", &library);
         }
@@ -157,6 +159,7 @@ impl fmt::Debug for Error {
 impl fmt::Display for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "error:{:08X}", self.code())?;
+        #[cfg(not(feature = "wolfssl440"))]
         match self.library() {
             Some(l) => write!(fmt, ":{}", l)?,
             None => write!(fmt, ":lib({})", unsafe {

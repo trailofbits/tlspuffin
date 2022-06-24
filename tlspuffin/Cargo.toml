@@ -32,6 +32,15 @@ libressl = [
     "transcript-extraction",
 ]
 
+wolfssl440 = [
+    "wolfssl-sys/vendored-wolfssl440",
+    "tls13",
+    "wolfssl-binding",
+    "session-resumption",
+    "transcript-extraction",
+    # FIXME: support "claims", "deterministic"
+]
+
 wolfssl510 = [
     "wolfssl-sys/vendored-wolfssl510",
     "tls13",
