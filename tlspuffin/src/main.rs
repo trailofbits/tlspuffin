@@ -66,6 +66,8 @@ fn main() {
     let minimizer = matches.is_present("minimizer");
     let monitor = matches.is_present("monitor");
 
+    info!("Version: {}", tlspuffin::GIT_REF);
+    info!("Put Versions:");
     for version in PUT_REGISTRY.version_strings() {
         info!("{}", version);
     }
