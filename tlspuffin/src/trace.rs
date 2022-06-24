@@ -68,9 +68,7 @@
 //!
 
 use core::fmt;
-use std::{
-    any::TypeId, cell::RefCell, convert::TryFrom, fmt::Formatter, ops::Deref, rc::Rc, slice::Iter,
-};
+use std::{any::TypeId, cell::RefCell, convert::TryFrom, ops::Deref, rc::Rc, slice::Iter};
 
 use itertools::Itertools;
 use log::{debug, info, trace};
@@ -128,7 +126,7 @@ impl QueryMatcher for TlsMessageType {
 }
 
 impl TryFrom<&MessageResult> for TlsMessageType {
-    type Error = crate::error::Error;
+    type Error = Error;
 
     fn try_from(message_result: &MessageResult) -> Result<Self, Self::Error> {
         let tls_opaque_type = message_result.1.typ;
@@ -196,13 +194,13 @@ where
 }
 
 impl fmt::Display for Knowledge {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "({})/{:?}", self.agent_name, self.tls_message_type)
     }
 }
 
 impl fmt::Display for Query {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
             "({}, {})[{:?}]",
@@ -439,7 +437,7 @@ pub struct Trace {
 
 /// A [`Trace`] consists of several [`Step`]s. Each has either a [`OutputAction`] or an [`InputAction`].
 /// Each [`Step`]s references an [`Agent`] by name. Furthermore, a trace also has a list of
-/// *AgentDescritptors* which act like a blueprint to spawn [`Agent`]s with a corresponding server
+/// *AgentDescriptors* which act like a blueprint to spawn [`Agent`]s with a corresponding server
 /// or client role and a specific TLs version. Essentially they are an [`Agent`] without a stream.
 impl Trace {
     fn spawn_agents(&self, ctx: &mut TraceContext) -> Result<(), Error> {
@@ -518,7 +516,7 @@ impl Trace {
 }
 
 impl fmt::Debug for Trace {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Trace with {} steps", self.steps.len())
     }
 }
@@ -564,7 +562,7 @@ impl Action {
 }
 
 impl fmt::Display for Action {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Action::Input(input) => write!(f, "{}", input),
             Action::Output(output) => write!(f, "{}", output),
@@ -646,7 +644,7 @@ impl OutputAction {
 }
 
 impl fmt::Display for OutputAction {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "OutputAction")
     }
 }
@@ -696,7 +694,7 @@ impl InputAction {
 }
 
 impl fmt::Display for InputAction {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "InputAction:\n{}", self.recipe)
     }
 }
