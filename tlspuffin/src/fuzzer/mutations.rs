@@ -11,7 +11,7 @@ use util::{Choosable, *};
 
 use crate::{
     algebra::{atoms::Function, Subterms, Term},
-    fuzzer::term_zoo::{generate_term_zoo, Zoo},
+    fuzzer::term_zoo::TermZoo,
     mutator,
     tls::SIGNATURE,
     trace::Trace,
@@ -201,7 +201,7 @@ mutator! {
     /// (such that types match). The new sub-term could come from another step which has a different recipe term.
     ReplaceReuseMutator,
     Trace,
-    // todo make sure that we do not replace a term with itself (performance improvement)
+    // TODO make sure that we do not replace a term with itself (performance improvement)
     fn mutate(
         &mut self,
         state: &mut S,
@@ -282,7 +282,7 @@ mutator! {
 }
 
 mutator! {
-    /// GENERATE: TODO
+    /// GENERATE: Generates a previously-unseen term using a
     GenerateMutator,
     Trace,
     fn mutate(
@@ -298,9 +298,9 @@ mutator! {
             self.mutation_counter += 1;
 
             let zoo = if self.mutation_counter % self.refresh_zoo_after == 0 {
-                self.zoo.insert(generate_term_zoo(&SIGNATURE, rand))
+                self.zoo.insert(TermZoo::generate(&SIGNATURE, rand))
             } else {
-                self.zoo.get_or_insert_with(|| generate_term_zoo(&SIGNATURE, rand))
+                self.zoo.get_or_insert_with(|| TermZoo::generate(&SIGNATURE, rand))
             };
 
             // Replace with generated term
@@ -322,7 +322,7 @@ mutator! {
     mutation_counter: u64,
     refresh_zoo_after: u64,
     constraints: TermConstraints,
-    zoo: Option<Zoo>
+    zoo: Option<TermZoo>
 }
 
 pub mod util {
@@ -453,12 +453,12 @@ pub mod util {
                             // consider in sampling
                             if reservoir.is_none() {
                                 // fill initial reservoir
-                                reservoir = Some((term, path)); // todo Rust 1.53 use insert
+                                reservoir = Some((term, path));
                             } else {
                                 // `1/visited` chance of overwriting
                                 // replace elements with gradually decreasing probability
                                 if rand.between(1, visited) == 1 {
-                                    reservoir = Some((term, path)); // todo Rust 1.53 use insert
+                                    reservoir = Some((term, path));
                                 }
                             }
                         }
@@ -585,7 +585,6 @@ mod tests {
     use crate::{
         agent::AgentName,
         algebra::{dynamic_function::DescribableFunction, Term},
-        fuzzer::term_zoo::generate_term_zoo,
         put_registry::current_put,
         tls::{fn_impl::*, seeds::*, SIGNATURE},
         trace::{Action, Step, Trace},
@@ -852,51 +851,6 @@ mod tests {
 
         assert!(std_dev < 30.0);
         assert_eq!(client_hello.size(), stats.len());
-    }
-
-    #[test]
-    fn test_term_generation() {
-        let mut rand = StdRand::with_seed(100);
-        let terms = generate_term_zoo(&SIGNATURE, &mut rand);
-
-        let subgraphs = terms
-            .iter()
-            .enumerate()
-            .map(|(i, term)| term.dot_subgraph(false, i, i.to_string().as_str()))
-            .collect::<Vec<_>>();
-
-        let _graph = format!(
-            "strict digraph \"Trace\" {{ splines=true; {} }}",
-            subgraphs.join("\n")
-        );
-
-        let all_functions = SIGNATURE
-            .functions
-            .iter()
-            .map(|(shape, _)| shape.name.to_string())
-            .collect::<HashSet<String>>();
-        let mut successfully_built_functions = terms
-            .iter()
-            .map(|term| term.name().to_string())
-            .collect::<HashSet<String>>();
-
-        let ignored_functions = [
-            // transcript functions -> VecClaimer is usually available as Variable
-            fn_decrypt_application.name(),
-            fn_server_finished_transcript.name(),
-            fn_client_finished_transcript.name(),
-            fn_server_hello_transcript.name(),
-        ]
-        .iter()
-        .map(|fn_name| fn_name.to_string())
-        .collect::<HashSet<String>>();
-
-        successfully_built_functions.extend(ignored_functions);
-
-        let difference = all_functions.difference(&successfully_built_functions);
-        //println!("{:?}", &difference);
-        assert_eq!(difference.count(), 0);
-        //println!("{}", graph);
     }
 
     #[test]
