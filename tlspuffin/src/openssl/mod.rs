@@ -216,7 +216,7 @@ impl OpenSSL {
 
     fn create_client(tls_version: TLSVersion) -> Result<Ssl, ErrorStack> {
         let mut ctx_builder = SslContext::builder(SslMethod::tls())?;
-        // Not sure whether we want this disabled or enabled: https://gitlab.inria.fr/mammann/tlspuffin/-/issues/26
+        // Not sure whether we want this disabled or enabled: https://github.com/tlspuffin/tlspuffin/issues/67
         // The tests become simpler if disabled to maybe that's what we want. Lets leave it default
         // for now.
         // https://wiki.openssl.org/index.php/TLS1.3#Middlebox_Compatibility_Mode

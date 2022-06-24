@@ -50,11 +50,7 @@ pub fn no_minimizer_feedback<'harness, 'b, S: 'b>(
 where
     S: HasExecutions + HasClientPerfMonitor + fmt::Debug + HasNamedMetadata,
 {
-    feedback_or!(MaxMapFeedback::new_tracking(
-        edges_observer,
-        false, // [TODO] [LH] Why are track_index and track_novelties are false?
-        false
-    ))
+    feedback_or!(MaxMapFeedback::new_tracking(edges_observer, false, false))
 }
 
 pub fn no_feedback<'harness, 'b, S: 'b>() -> impl Feedback<Trace, S> + 'b
@@ -487,10 +483,6 @@ pub fn start(config: FuzzerConfig, log_handle: Handle) {
             .run_client(&mut run_client)
             .cores(&cores)
             .broker_port(config.broker_port)
-            // There is no need to disable the stdout of the clients.
-            // tlspuffin never logs or outputs to stdout. It always logs its output
-            // to tlspuffin-log.json.
-            // Therefore, this the following has no effect: .stdout_file(Some("/dev/null"))
             .build()
             .launch(),
         false => libafl::bolts::launcher::Launcher::builder()
@@ -508,8 +500,10 @@ pub fn start(config: FuzzerConfig, log_handle: Handle) {
             .run_client(&mut run_client)
             .cores(&cores)
             .broker_port(config.broker_port)
-            //todo where should we log the output of the harness?
-            //.stdout_file(Some("/dev/null"))
+            // There is no need to disable the stdout of the clients.
+            // tlspuffin never logs or outputs to stdout. It always logs its output
+            // to tlspuffin-log.json.
+            // Therefore, this the following has no effect: .stdout_file(Some("/dev/null"))
             .build()
             .launch(),
     };

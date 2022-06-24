@@ -1,4 +1,4 @@
-//! Stats to disply both cumulative and per-client stats
+//! Stats to display both cumulative and per-client stats
 
 use core::{time, time::Duration};
 use std::{

@@ -86,9 +86,10 @@ use crate::{
     algebra::{dynamic_function::TypeShape, remove_prefix, Term},
     debug::{debug_message_with_info, debug_opaque_message_with_info},
     error::Error,
+    extraction::extract_knowledge,
     io::MessageResult,
     tls::error::FnError,
-    variable_data::{extract_knowledge, VariableData},
+    variable_data::VariableData,
 };
 
 /// [MessageType] contains TLS-related typing information, this is to be distinguished from the *.typ fields
