@@ -265,7 +265,7 @@ impl WolfSSL {
         #[cfg(not(feature = "wolfssl430"))]
         {
             let rsa = crate::wolfssl::rsa::Rsa::private_key_from_pem(PRIVATE_KEY.as_bytes())?;
-            let pkey = PKey::from_rsa(rsa)?;
+            let pkey = crate::wolfssl::pkey::PKey::from_rsa(rsa)?;
             ctx.set_private_key(pkey.as_ref())?;
         }
         #[cfg(feature = "wolfssl430")]

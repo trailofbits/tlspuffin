@@ -149,9 +149,12 @@ impl SslContextRef {
     ///
     /// [`SSL_CTX_use_PrivateKey`]: https://www.openssl.org/docs/man1.0.2/ssl/SSL_CTX_use_PrivateKey_file.html
     #[cfg(not(feature = "wolfssl430"))]
-    pub fn set_private_key<T>(&mut self, key: &openssl::pkey::PKeyRef<T>) -> Result<(), ErrorStack>
+    pub fn set_private_key<T>(
+        &mut self,
+        key: &crate::wolfssl::pkey::PKeyRef<T>,
+    ) -> Result<(), ErrorStack>
     where
-        T: openssl::pkey::HasPrivate,
+        T: crate::wolfssl::pkey::HasPrivate,
     {
         unsafe {
             cvt(wolf::wolfSSL_CTX_use_PrivateKey(

@@ -21,15 +21,18 @@ openssl111 = [
 openssl101f = [
     "openssl/vendored-openssl101f", "openssl/weak-crypto", # We want to allow weak-crypto for FREAK
     "openssl-binding",
+    "tls12-session-resumption"
 ]
 openssl102u = [
     "openssl/vendored-openssl102u", "openssl/weak-crypto", # We want to allow weak-crypto for FREAK
     "openssl-binding",
+    "tls12-session-resumption"
 ]
 # Some LibreSSL version
 libressl = [
     "openssl/vendored-libressl",
     "tls13", # Supported features by openssl111
+    "tls12-session-resumption",
     "claims",
     "openssl-binding",
     "transcript-extraction",
