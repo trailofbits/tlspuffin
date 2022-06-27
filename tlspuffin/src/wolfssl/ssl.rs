@@ -22,7 +22,6 @@ use crate::{
         bio,
         callbacks::{msg_callback, ExtraUserDataRegistry, UserData},
         error::{ErrorCode, ErrorStack, InnerError, SslError},
-        pkey::{HasPrivate, PKeyRef},
         util::{cvt, cvt_p},
         x509::X509Ref,
     },
@@ -149,26 +148,27 @@ impl SslContextRef {
     /// This corresponds to [`SSL_CTX_use_PrivateKey`].
     ///
     /// [`SSL_CTX_use_PrivateKey`]: https://www.openssl.org/docs/man1.0.2/ssl/SSL_CTX_use_PrivateKey_file.html
-    pub fn set_private_key<T>(&mut self, key: &PKeyRef<T>) -> Result<(), ErrorStack>
+    #[cfg(not(feature = "wolfssl430"))]
+    pub fn set_private_key<T>(&mut self, key: &openssl::pkey::PKeyRef<T>) -> Result<(), ErrorStack>
     where
-        T: HasPrivate,
+        T: openssl::pkey::HasPrivate,
     {
         unsafe {
-            /*cvt(wolf::wolfSSL_CTX_use_PrivateKey(
+            cvt(wolf::wolfSSL_CTX_use_PrivateKey(
                 self.as_ptr(),
                 key.as_ptr(),
             ))
-            .map(|_| ())*/
+            .map(|_| ())
+        }
+    }
 
-            let bytes = PRIVATE_KEY.as_bytes();
-
-            let pkey = (*key.as_ptr());
+    #[cfg(feature = "wolfssl430")]
+    pub fn set_private_key_pem(&mut self, key: &[u8]) -> Result<(), ErrorStack> {
+        unsafe {
             cvt(wolf::wolfSSL_CTX_use_PrivateKey_buffer(
                 self.as_ptr(),
-                bytes.as_ptr() as *const u8,
-                bytes.len() as i64,
-                //pkey.pkey.ptr as *const u8,
-                //pkey.pkey_sz as i64,
+                key.as_ptr() as *const u8,
+                key.len() as i64,
                 wolf::WOLFSSL_FILETYPE_PEM,
             ))
             .map(|_| ())
@@ -186,7 +186,7 @@ impl SslContextRef {
         }
     }
 
-    #[cfg(not(feature = "wolfssl440"))]
+    #[cfg(not(feature = "wolfssl430"))]
     pub fn set_num_tickets(&mut self, n: u64) -> Result<(), ErrorStack> {
         unsafe { cvt(wolf::wolfSSL_CTX_set_num_tickets(self.as_ptr(), n)).map(|_| ()) }
     }
@@ -341,7 +341,7 @@ impl SslRef {
                 "SERVER_ENCRYPTED_EXTENSIONS_COMPLETE"
             }
             wolf::states_SERVER_CERT_COMPLETE => "SERVER_CERT_COMPLETE",
-            #[cfg(not(feature = "wolfssl440"))]
+            #[cfg(not(feature = "wolfssl430"))]
             wolf::states_SERVER_CERT_VERIFY_COMPLETE => "SERVER_CERT_VERIFY_COMPLETE",
             wolf::states_SERVER_KEYEXCHANGE_COMPLETE => "SERVER_KEYEXCHANGE_COMPLETE",
             wolf::states_SERVER_HELLODONE_COMPLETE => "SERVER_HELLODONE_COMPLETE",
@@ -595,13 +595,19 @@ impl<S: Read + Write> SslStream<S> {
             0
         }
 
+        #[cfg(feature = "wolfssl430")]
+        type WolfTimeval = wolf::Timeval;
+
+        #[cfg(not(feature = "wolfssl430"))]
+        type WolfTimeval = wolf::WOLFSSL_TIMEVAL;
+
         let ret = unsafe {
             //wolf::wolfSSL_SSL_do_handshake(self.ssl.as_ptr())
             wolf::wolfSSL_accept_ex(
                 self.ssl.as_ptr(),
                 Some(SSL_connect_ex),
                 Some(SSL_connect_timeout_ex),
-                wolf::WOLFSSL_TIMEVAL {
+                WolfTimeval {
                     tv_sec: 5,
                     tv_usec: 0,
                 },

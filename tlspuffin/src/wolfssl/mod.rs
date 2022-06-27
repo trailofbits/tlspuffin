@@ -20,7 +20,6 @@ use crate::{
     trace::ClaimList,
     wolfssl::{
         error::{ErrorStack, SslError},
-        pkey::PKey,
         ssl::{Ssl, SslContext, SslMethod, SslRef, SslStream, SslVerifyMode},
         transcript::claim_transcript,
         version::version,
@@ -32,7 +31,9 @@ mod bio;
 mod callbacks;
 // TODO: remove: mod dummy_callbacks;
 mod error;
+#[cfg(not(feature = "wolfssl430"))]
 mod pkey;
+#[cfg(not(feature = "wolfssl430"))]
 mod rsa;
 mod ssl;
 mod transcript;
@@ -261,14 +262,15 @@ impl WolfSSL {
         let cert = X509::from_pem(CERT.as_bytes())?;
         ctx.set_certificate(cert.as_ref())?;
 
-        let rsa = crate::wolfssl::rsa::Rsa::private_key_from_pem(PRIVATE_KEY.as_bytes())?;
-        let pkey = PKey::from_rsa(rsa)?;
-        ctx.set_private_key(pkey.as_ref())?;
-
-        unsafe {
-            //wolfssl_sys::wolfSSL_CTX_set_psk_server_callback();
-            let string = CString::new("test").unwrap();
-            wolfssl_sys::wolfSSL_CTX_use_psk_identity_hint(ctx.as_ptr(), string.as_ptr());
+        #[cfg(not(feature = "wolfssl430"))]
+        {
+            let rsa = crate::wolfssl::rsa::Rsa::private_key_from_pem(PRIVATE_KEY.as_bytes())?;
+            let pkey = PKey::from_rsa(rsa)?;
+            ctx.set_private_key(pkey.as_ref())?;
+        }
+        #[cfg(feature = "wolfssl430")]
+        {
+            ctx.set_private_key_pem(PRIVATE_KEY.as_bytes())?;
         }
 
         // Callbacks for experiements
@@ -278,7 +280,7 @@ impl WolfSSL {
         //wolf::wolfSSL_set_tls13_secret_cb(ssl.as_ptr(), Some(SSL_keylog13), ptr::null_mut());
 
         // We expect two tickets like in OpenSSL
-        #[cfg(not(feature = "wolfssl440"))]
+        #[cfg(not(feature = "wolfssl430"))]
         ctx.set_num_tickets(2)?;
 
         //// SSL pointer builder
