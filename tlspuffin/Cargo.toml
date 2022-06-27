@@ -43,6 +43,7 @@ wolfssl430 = [
     "tls13",
     "wolfssl-binding",
     "transcript-extraction",
+    # Does not support any kind of resumption right now: https://github.com/trailofbits/tlspuffin/issues/12
     # FIXME: support "claims", "deterministic"
 ]
 
