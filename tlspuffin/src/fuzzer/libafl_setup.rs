@@ -408,11 +408,20 @@ where
             >,
         > + ProgressReporter<Trace>,
 {
+    #[cfg(not(feature = "sancov_libafl"))]
     fn install_minimizer(self) -> Self {
+        warn!("Unable to install minimizer. Feature `sancov_libafl` is not enabled.");
+        self
+    }
+
+    #[cfg(feature = "sancov_libafl")]
+    fn install_minimizer(self) -> Self {
+        pub use libafl_targets::{EDGES_MAP, MAX_EDGES_NUM};
+
         let (feedback, observers) = {
             let time_observer = TimeObserver::new("time");
             let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", unsafe {
-                &mut super::sanitizer::EDGES_MAP[0..super::sanitizer::MAX_EDGES_NUM]
+                &mut EDGES_MAP[0..MAX_EDGES_NUM]
             }));
             let feedback = feedback_or!(
                 // New maximization map feedback linked to the edges observer and the feedback state
