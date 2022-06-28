@@ -12,15 +12,17 @@ cfg_if::cfg_if! {
         #[allow(unused_imports)]
         // This import achieves that OpenSSl compiled with -fsanitize-coverage=trace-pc-guard can link
         pub use libafl_targets;
+    }
+}
 
-        if #[cfg(feature = "sancov_pcguard_log")] {
-            pub mod sancov_pcguard_log;
-            pub const EDGES_MAP_SIZE: usize = 65536;
-            pub static mut EDGES_MAP: [u8; EDGES_MAP_SIZE] = [0; EDGES_MAP_SIZE];
-            pub static mut MAX_EDGES_NUM: usize = 0;
-        } else if #[cfg(feature = "sancov_libafl")] {
-            pub use libafl_targets::{EDGES_MAP, MAX_EDGES_NUM};
-        }
+cfg_if::cfg_if! {
+    if #[cfg(all(not(test), feature = "sancov_pcguard_log"))] {
+        pub mod sancov_pcguard_log;
+        pub const EDGES_MAP_SIZE: usize = 65536;
+        pub static mut EDGES_MAP: [u8; EDGES_MAP_SIZE] = [0; EDGES_MAP_SIZE];
+        pub static mut MAX_EDGES_NUM: usize = 0;
+    } else if #[cfg(all(not(test), feature = "sancov_libafl"))] {
+        pub use libafl_targets::{EDGES_MAP, MAX_EDGES_NUM};
     }
 }
 
