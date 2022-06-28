@@ -7,7 +7,7 @@ pub mod sancov_dummy;
 #[cfg(all(not(test), feature = "sancov_pcguard_log"))]
 pub mod sancov_pcguard_log;
 
-#[allow(dead_code)]
+#[allow(unused_imports)]
 // This import achieves that OpenSSl compiled with -fsanitize-coverage=trace-pc-guard can link
 pub use libafl_targets;
 #[cfg(all(not(test), feature = "sancov_libafl"))]
