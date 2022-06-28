@@ -22,11 +22,11 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     monitors::tui::TuiMonitor,
     observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver, TimeObserver},
-    schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler, Scheduler},
+    schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler, RandScheduler, Scheduler},
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasNamedMetadata, StdState},
     Error, Evaluator,
 };
-use log::{info, warn};
+use log::{error, info, warn};
 use log4rs::Handle;
 
 use super::harness;
@@ -408,13 +408,6 @@ where
             >,
         > + ProgressReporter<Trace>,
 {
-    #[cfg(not(feature = "sancov_libafl"))]
-    fn install_minimizer(self) -> Self {
-        warn!("Unable to install minimizer. Feature `sancov_libafl` is not enabled.");
-        self
-    }
-
-    #[cfg(feature = "sancov_libafl")]
     fn install_minimizer(self) -> Self {
         pub use libafl_targets::{EDGES_MAP, MAX_EDGES_NUM};
 
@@ -442,7 +435,7 @@ where
 
 /// Starts the fuzzing loop
 pub fn start(config: FuzzerConfig, log_handle: Handle) {
-    info!("Running on {} cores", &config.core_definition);
+    info!("Running on cores: {}", &config.core_definition);
 
     let mut run_client =
         |state: Option<StdState<_, Trace, _, _>>,
@@ -451,15 +444,15 @@ pub fn start(config: FuzzerConfig, log_handle: Handle) {
          -> Result<(), Error> {
             PUT_REGISTRY.make_deterministic();
 
-            log_handle
-                .clone()
-                .set_config(create_file_config(&config.log_file));
-
             let seed = config
                 .static_seed
                 .unwrap_or(event_manager.mgr_id().id as u64);
             info!("Seed is {}", seed);
-            RunClientBuilder::new(config.clone(), &mut harness::harness, state, event_manager)
+            let harness_fn = &mut harness::harness;
+
+            let mut builder =
+                RunClientBuilder::new(config.clone(), harness_fn, state, event_manager);
+            builder = builder
                 .with_rand(StdRand::with_seed(seed))
                 .with_corpus(
                     CachedOnDiskCorpus::new_save_meta(
@@ -476,9 +469,27 @@ pub fn start(config: FuzzerConfig, log_handle: Handle) {
                     )
                     .unwrap(),
                 )
-                .with_objective(feedback_or!(CrashFeedback::new(), TimeoutFeedback::new()))
-                .install_minimizer()
-                .run_client()
+                .with_objective(feedback_or!(CrashFeedback::new(), TimeoutFeedback::new()));
+
+            #[cfg(feature = "sancov_libafl")]
+            {
+                builder = builder.install_minimizer();
+            }
+
+            #[cfg(not(feature = "sancov_libafl"))]
+            {
+                log::error!("Running without minimizer is unsupported");
+                builder = builder
+                    .with_feedback(())
+                    .with_observers(())
+                    .with_scheduler(RandScheduler::new());
+            }
+
+            log_handle
+                .clone()
+                .set_config(create_file_config(&config.log_file));
+
+            builder.run_client()
         };
 
     let cores = Cores::from_cmdline(config.core_definition.as_str()).unwrap();
