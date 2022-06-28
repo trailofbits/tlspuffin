@@ -227,6 +227,7 @@ fn main() {
                 objective_dir: experiment_path.join("objective"),
                 broker_port: port,
                 monitor_file: experiment_path.join("stats.json"),
+                log_file: experiment_path.join("log.json"),
                 minimizer,
                 mutation_stage_config: Default::default(),
                 mutation_config: Default::default(),

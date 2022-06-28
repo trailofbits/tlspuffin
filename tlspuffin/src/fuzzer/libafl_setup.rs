@@ -96,6 +96,7 @@ pub struct FuzzerConfig {
     pub mutation_stage_config: MutationStageConfig,
     pub mutation_config: MutationConfig,
     pub monitor: bool,
+    pub log_file: PathBuf,
 }
 
 #[derive(Clone, Copy)]
@@ -443,7 +444,7 @@ pub fn start(config: FuzzerConfig, log_handle: Handle) {
 
             log_handle
                 .clone()
-                .set_config(create_file_config(&PathBuf::from("tlspuffin-log.json")));
+                .set_config(create_file_config(&config.log_file));
 
             let seed = config
                 .static_seed
