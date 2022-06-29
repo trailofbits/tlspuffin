@@ -505,7 +505,7 @@ pub fn start(config: FuzzerConfig, log_handle: Handle) -> Result<(), libafl::Err
                 builder = builder
                     .with_feedback(())
                     .with_observers(())
-                    .with_scheduler(RandScheduler::new());
+                    .with_scheduler(libafl::schedulers::RandScheduler::new());
             }
 
             log_handle.clone().set_config(create_file_config(log_file));
