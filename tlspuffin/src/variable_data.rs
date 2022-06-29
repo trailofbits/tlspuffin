@@ -6,17 +6,9 @@ use std::{
     fmt::Debug,
 };
 
-use rustls::{
-    internal::msgs::{
-        enums::Compression,
-        handshake::{ClientExtension, HandshakePayload, ServerExtension},
-        message::{Message, MessagePayload},
-    },
-    msgs::handshake::ServerKeyExchangePayload,
-    CipherSuite,
-};
 
-use crate::error::Error;
+
+
 
 pub trait VariableData: Debug {
     fn boxed(&self) -> Box<dyn VariableData>;

@@ -1,21 +1,14 @@
 use std::{
     env,
-    ffi::{CStr, CString},
     fs,
     fs::File,
     io::{Read, Write},
     path::PathBuf,
-    ptr,
 };
 
 use clap::{arg, crate_authors, crate_name, crate_version, Command};
-use log::{info, LevelFilter};
-use log4rs::{
-    append::{console::ConsoleAppender, file::FileAppender},
-    config::{Appender, Root},
-    encode::{json::JsonEncoder, pattern::PatternEncoder},
-    Config,
-};
+use log::{info};
+
 use tlspuffin::{
     experiment::*,
     fuzzer::{

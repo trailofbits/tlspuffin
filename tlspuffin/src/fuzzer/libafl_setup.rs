@@ -6,13 +6,12 @@ use libafl::{
         core_affinity::Cores,
         rands::{Rand, StdRand},
         shmem::{ShMemProvider, StdShMemProvider},
-        staterestore::StateRestorer,
         tuples::tuple_list,
     },
     corpus::{ondisk::OnDiskMetadataFormat, CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{
         setup_restarting_mgr_std, EventConfig, EventFirer, EventManager, EventRestarter,
-        HasEventManagerId, LlmpEventManager, LlmpRestartingEventManager, ProgressReporter,
+        HasEventManagerId, LlmpRestartingEventManager, ProgressReporter,
     },
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or,
@@ -23,11 +22,11 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     monitors::tui::TuiMonitor,
     observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver, TimeObserver},
-    schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler, RandScheduler, Scheduler},
+    schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler, Scheduler},
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasNamedMetadata, StdState},
     Error, Evaluator,
 };
-use log::{error, info, warn};
+use log::{info, warn};
 use log4rs::Handle;
 
 use super::harness;
@@ -509,13 +508,13 @@ pub fn start(config: FuzzerConfig, log_handle: Handle) -> Result<(), libafl::Err
                     .with_scheduler(RandScheduler::new());
             }
 
-            log_handle.clone().set_config(create_file_config(&log_file));
+            log_handle.clone().set_config(create_file_config(log_file));
 
             builder.run_client()
         };
 
     if *no_launcher {
-        let (state, mut restarting_mgr) = setup_restarting_mgr_std(
+        let (state, restarting_mgr) = setup_restarting_mgr_std(
             StatsMonitor::new(
                 |s| {
                     info!("{}", s);
