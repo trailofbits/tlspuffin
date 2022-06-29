@@ -6,12 +6,13 @@ use libafl::{
         core_affinity::Cores,
         rands::{Rand, StdRand},
         shmem::{ShMemProvider, StdShMemProvider},
+        staterestore::StateRestorer,
         tuples::tuple_list,
     },
     corpus::{ondisk::OnDiskMetadataFormat, CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{
-        EventConfig, EventFirer, EventManager, EventRestarter, HasEventManagerId,
-        LlmpRestartingEventManager, ProgressReporter,
+        setup_restarting_mgr_std, EventConfig, EventFirer, EventManager, EventRestarter,
+        HasEventManagerId, LlmpEventManager, LlmpRestartingEventManager, ProgressReporter,
     },
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or,
@@ -96,6 +97,7 @@ pub struct FuzzerConfig {
     pub mutation_stage_config: MutationStageConfig,
     pub mutation_config: MutationConfig,
     pub monitor: bool,
+    pub no_launcher: bool,
     pub log_file: PathBuf,
 }
 
@@ -445,8 +447,21 @@ where
 }
 
 /// Starts the fuzzing loop
-pub fn start(config: FuzzerConfig, log_handle: Handle) {
-    info!("Running on cores: {}", &config.core_definition);
+pub fn start(config: FuzzerConfig, log_handle: Handle) -> Result<(), libafl::Error> {
+    let FuzzerConfig {
+        core_definition,
+        corpus_dir,
+        objective_dir,
+        static_seed,
+        log_file,
+        monitor_file,
+        broker_port,
+        monitor,
+        no_launcher,
+        ..
+    } = &config;
+
+    info!("Running on cores: {}", &core_definition);
 
     let mut run_client =
         |state: Option<StdState<_, Trace, _, _>>,
@@ -455,9 +470,7 @@ pub fn start(config: FuzzerConfig, log_handle: Handle) {
          -> Result<(), Error> {
             PUT_REGISTRY.make_deterministic();
 
-            let seed = config
-                .static_seed
-                .unwrap_or(event_manager.mgr_id().id as u64);
+            let seed = static_seed.unwrap_or(event_manager.mgr_id().id as u64);
             info!("Seed is {}", seed);
             let harness_fn = &mut harness::harness;
 
@@ -467,7 +480,7 @@ pub fn start(config: FuzzerConfig, log_handle: Handle) {
                 .with_rand(StdRand::with_seed(seed))
                 .with_corpus(
                     CachedOnDiskCorpus::new_save_meta(
-                        config.corpus_dir.clone(),
+                        corpus_dir.clone(),
                         Some(OnDiskMetadataFormat::Json),
                         1000,
                     )
@@ -475,7 +488,7 @@ pub fn start(config: FuzzerConfig, log_handle: Handle) {
                 )
                 .with_objective_corpus(
                     OnDiskCorpus::new_save_meta(
-                        config.objective_dir.clone(),
+                        objective_dir.clone(),
                         Some(OnDiskMetadataFormat::JsonPretty),
                     )
                     .unwrap(),
@@ -496,57 +509,62 @@ pub fn start(config: FuzzerConfig, log_handle: Handle) {
                     .with_scheduler(RandScheduler::new());
             }
 
-            log_handle
-                .clone()
-                .set_config(create_file_config(&config.log_file));
+            log_handle.clone().set_config(create_file_config(&log_file));
 
             builder.run_client()
         };
 
-    let cores = Cores::from_cmdline(config.core_definition.as_str()).unwrap();
-    let configuration: EventConfig = "launcher default".into();
-    let sh_mem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
-
-    let launch_result = match config.monitor {
-        true => libafl::bolts::launcher::Launcher::builder()
-            .shmem_provider(sh_mem_provider)
-            .configuration(configuration)
-            .monitor(TuiMonitor::new("test".to_string(), false))
-            .run_client(&mut run_client)
-            .cores(&cores)
-            .broker_port(config.broker_port)
-            .build()
-            .launch(),
-        false => libafl::bolts::launcher::Launcher::builder()
-            .shmem_provider(sh_mem_provider)
-            .configuration(configuration)
-            .monitor(
-                StatsMonitor::new(
-                    |s| {
-                        info!("{}", s);
-                    },
-                    config.monitor_file.clone(),
-                )
-                .unwrap(),
+    if *no_launcher {
+        let (state, mut restarting_mgr) = setup_restarting_mgr_std(
+            StatsMonitor::new(
+                |s| {
+                    info!("{}", s);
+                },
+                monitor_file.clone(),
             )
-            .run_client(&mut run_client)
-            .cores(&cores)
-            .broker_port(config.broker_port)
-            // There is no need to disable the stdout of the clients.
-            // tlspuffin never logs or outputs to stdout. It always logs its output
-            // to tlspuffin-log.json.
-            // Therefore, this the following has no effect: .stdout_file(Some("/dev/null"))
-            .build()
-            .launch(),
-    };
-    if let Err(error) = launch_result {
-        match error {
-            Error::ShuttingDown => {
-                // ignore
-            }
-            _ => {
-                panic!("{}", error)
-            }
+            .unwrap(),
+            *broker_port,
+            EventConfig::AlwaysUnique,
+        )?;
+
+        run_client(state, restarting_mgr, 0)
+    } else {
+        let cores = Cores::from_cmdline(config.core_definition.as_str()).unwrap();
+        let configuration: EventConfig = "launcher default".into();
+        let sh_mem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
+
+        if *monitor {
+            libafl::bolts::launcher::Launcher::builder()
+                .shmem_provider(sh_mem_provider)
+                .configuration(configuration)
+                .monitor(TuiMonitor::new("test".to_string(), false))
+                .run_client(&mut run_client)
+                .cores(&cores)
+                .broker_port(*broker_port)
+                .build()
+                .launch()
+        } else {
+            libafl::bolts::launcher::Launcher::builder()
+                .shmem_provider(sh_mem_provider)
+                .configuration(configuration)
+                .monitor(
+                    StatsMonitor::new(
+                        |s| {
+                            info!("{}", s);
+                        },
+                        monitor_file.clone(),
+                    )
+                    .unwrap(),
+                )
+                .run_client(&mut run_client)
+                .cores(&cores)
+                .broker_port(*broker_port)
+                // There is no need to disable the stdout of the clients.
+                // tlspuffin never logs or outputs to stdout. It always logs its output
+                // to tlspuffin-log.json.
+                // Therefore, this the following has no effect: .stdout_file(Some("/dev/null"))
+                .build()
+                .launch()
         }
     }
 }

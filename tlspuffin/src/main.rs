@@ -37,6 +37,7 @@ fn create_app() -> Command<'static> {
         .arg(arg!(-i --"max-iters" [i] "Maximum iterations to do"))
         .arg(arg!(--minimizer "Use a minimizer"))
         .arg(arg!(--monitor "Use a monitor"))
+        .arg(arg!(--"no-launcher" "Do not use the convenient launcher"))
         .subcommands(vec![
             Command::new("quick-experiment").about("Starts a new experiment and writes the results out"),
             Command::new("experiment").about("Starts a new experiment and writes the results out")
@@ -115,6 +116,7 @@ fn main() {
     let max_iters: Option<u64> = matches.value_of_t("max-iters").ok();
     let minimizer = matches.is_present("minimizer");
     let monitor = matches.is_present("monitor");
+    let no_launcher = matches.is_present("no-launcher");
 
     info!("Version: {}", tlspuffin::GIT_REF);
     info!("Put Versions:");
@@ -217,23 +219,32 @@ fn main() {
 
         fs::create_dir_all(&experiment_path).unwrap();
 
-        start(
-            FuzzerConfig {
-                initial_corpus_dir: experiment_path.join("seeds"),
-                static_seed,
-                max_iters,
-                core_definition: core_definition.to_string(),
-                corpus_dir: experiment_path.join("corpus"),
-                objective_dir: experiment_path.join("objective"),
-                broker_port: port,
-                monitor_file: experiment_path.join("stats.json"),
-                log_file: experiment_path.join("log.json"),
-                minimizer,
-                mutation_stage_config: Default::default(),
-                mutation_config: Default::default(),
-                monitor,
-            },
-            log_handle,
-        );
+        let config = FuzzerConfig {
+            initial_corpus_dir: experiment_path.join("seeds"),
+            static_seed,
+            max_iters,
+            core_definition: core_definition.to_string(),
+            corpus_dir: experiment_path.join("corpus"),
+            objective_dir: experiment_path.join("objective"),
+            broker_port: port,
+            monitor_file: experiment_path.join("stats.json"),
+            log_file: experiment_path.join("log.json"),
+            minimizer,
+            mutation_stage_config: Default::default(),
+            mutation_config: Default::default(),
+            monitor,
+            no_launcher,
+        };
+
+        if let Err(err) = start(config, log_handle) {
+            match err {
+                libafl::Error::ShuttingDown => {
+                    // ignore
+                }
+                _ => {
+                    panic!("{}", err)
+                }
+            }
+        }
     }
 }
