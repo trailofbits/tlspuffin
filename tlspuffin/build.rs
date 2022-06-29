@@ -1,4 +1,4 @@
-use std::{process::Command};
+use std::process::Command;
 
 pub fn get_git_ref() -> String {
     Command::new("git")

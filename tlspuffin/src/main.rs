@@ -1,14 +1,12 @@
 use std::{
-    env,
-    fs,
+    env, fs,
     fs::File,
     io::{Read, Write},
     path::PathBuf,
 };
 
 use clap::{arg, crate_authors, crate_name, crate_version, Command};
-use log::{info};
-
+use log::info;
 use tlspuffin::{
     experiment::*,
     fuzzer::{

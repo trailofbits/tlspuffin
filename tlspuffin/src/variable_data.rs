@@ -6,10 +6,6 @@ use std::{
     fmt::Debug,
 };
 
-
-
-
-
 pub trait VariableData: Debug {
     fn boxed(&self) -> Box<dyn VariableData>;
     fn boxed_any(&self) -> Box<dyn Any>;
