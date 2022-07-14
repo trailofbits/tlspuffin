@@ -2298,7 +2298,8 @@ pub fn create_corpus() -> Vec<(Trace, &'static str)> {
         seed_successful: cfg(feature = "tls13"),
         seed_successful_with_ccs: cfg(feature = "tls13"),
         seed_successful_with_tickets: cfg(feature = "tls13"),
-        seed_successful12,
+        seed_successful12: cfg(not(feature = "tls12-session-resumption")),
+        seed_successful12_with_tickets: cfg(feature = "tls12-session-resumption"),
         // Client Attackers
         seed_client_attacker: cfg(feature = "tls13"),
         seed_client_attacker_auth: cfg(all(feature = "tls13", feature = "client-authentication-transcript-extraction")),
