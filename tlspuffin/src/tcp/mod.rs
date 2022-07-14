@@ -282,7 +282,7 @@ impl TcpPut for TcpServerPut {
         thread::spawn(move || {
             let listener = TcpListener::bind(&addr).unwrap();
 
-            for mut new_stream in listener.incoming() {
+            if let Some(new_stream) = listener.incoming().next() {
                 let stream = new_stream.unwrap();
                 // We are waiting 500ms for a response of the PUT behind the TCP socket.
                 // If we are expecting data from it and this timeout is reached, then we assume that
@@ -292,7 +292,6 @@ impl TcpPut for TcpServerPut {
                     .unwrap();
                 stream.set_nodelay(true).unwrap();
                 sender.send((stream, listener)).unwrap();
-                break;
             }
         });
 
