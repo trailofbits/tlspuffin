@@ -526,7 +526,7 @@ mod tests {
         tcp::{collect_output, execute_command, TLSProcess},
         tls::seeds::{
             seed_client_attacker_full, seed_session_resumption_dhe_full, seed_successful12,
-            SeedHelper,
+            seed_successful12_with_tickets, SeedHelper,
         },
     };
 
@@ -731,7 +731,7 @@ mod tests {
     }
 
     #[test]
-    fn test_wolfssl_openssl_seed_successful12() {
+    fn test_openssl_openssl_seed_successful12() {
         let port = 44332;
 
         let server_guard = openssl_server(port, TLSVersion::V1_2);
@@ -742,18 +742,58 @@ mod tests {
 
         let port = 55333;
 
+        let client_guard = openssl_client(port, TLSVersion::V1_2);
+        let client = PutDescriptor {
+            name: TCP_SERVER_PUT,
+            options: client_guard.build_options(),
+        };
+
+        let trace =
+            seed_successful12_with_tickets.build_trace_with_puts(&[client.clone(), server.clone()]);
+        let mut context = trace.execute_default();
+
+        let client = AgentName::first();
+        let shutdown = context.find_agent_mut(client).unwrap().put.shutdown();
+        info!("{}", shutdown);
+        assert!(shutdown.contains("Timeout   : 7200 (sec)"));
+
+        let server = client.next();
+        let shutdown = context.find_agent_mut(server).unwrap().put.shutdown();
+        info!("{}", shutdown);
+        assert!(shutdown.contains("BEGIN SSL SESSION PARAMETERS"));
+    }
+
+    #[test]
+    #[ignore] // wolfssl example server and client are not available in CI
+    fn test_wolfssl_openssl_seed_successful12() {
+        let port = 44336;
+
+        let server_guard = openssl_server(port, TLSVersion::V1_2);
+        let server = PutDescriptor {
+            name: TCP_CLIENT_PUT,
+            options: server_guard.build_options(),
+        };
+
+        let port = 55337;
+
         let client_guard = wolfssl_client(port, TLSVersion::V1_2);
         let client = PutDescriptor {
             name: TCP_SERVER_PUT,
             options: client_guard.build_options(),
         };
 
-        let trace = seed_successful12.build_trace_with_puts(&[client.clone(), server.clone()]);
+        let trace =
+            seed_successful12_with_tickets.build_trace_with_puts(&[client.clone(), server.clone()]);
         let mut context = trace.execute_default();
 
         let client = AgentName::first();
         let shutdown = context.find_agent_mut(client).unwrap().put.shutdown();
         info!("{}", shutdown);
-        assert!(shutdown.contains("Session Ticket Error"));
+        assert!(!shutdown.contains("fail"));
+
+        let server = client.next();
+        let shutdown = context.find_agent_mut(server).unwrap().put.shutdown();
+        info!("{}", shutdown);
+        assert!(shutdown.contains("BEGIN SSL SESSION PARAMETERS"));
     }
 }

@@ -448,6 +448,44 @@ pub fn seed_successful_mitm(
     }
 }
 
+pub fn seed_successful12_with_tickets(
+    client: AgentName,
+    server: AgentName,
+    client_put: PutDescriptor,
+    server_put: PutDescriptor,
+) -> Trace {
+    let mut trace = seed_successful12(client, server, client_put, server_put);
+    // NewSessionTicket, Server -> Client
+    // wolfSSL 4.4.0 does not support tickets in TLS 1.2
+    trace.steps.insert(
+        9,
+        Step {
+            agent: client,
+            action: Action::Input(InputAction {
+                recipe: term! {
+                    fn_new_session_ticket(
+                        ((server, 0)/u64),
+                        ((server, 0)[Some(TlsMessageType::Handshake(Some(HandshakeType::NewSessionTicket)))]/Vec<u8>)
+                    )
+                },
+            }),
+        },
+    );
+
+    trace.steps[11] = Step {
+        agent: client,
+        action: Action::Input(InputAction {
+            recipe: term! {
+                fn_opaque_message(
+                    ((server, 6)[None])
+                )
+            },
+        }),
+    };
+
+    trace
+}
+
 pub fn seed_successful12(
     client: AgentName,
     server: AgentName,
@@ -555,20 +593,6 @@ pub fn seed_successful12(
                     },
                 }),
             },
-            // NewSessionTicket, Server -> Client
-            // wolfSSL 4.4.0 does not support tickets in TLS 1.2
-            #[cfg(feature = "tls12-session-resumption")]
-            Step {
-                agent: client,
-                action: Action::Input(InputAction {
-                    recipe: term! {
-                        fn_new_session_ticket(
-                            ((server, 0)/u64),
-                            ((server, 0)[Some(TlsMessageType::Handshake(Some(HandshakeType::NewSessionTicket)))]/Vec<u8>)
-                        )
-                    },
-                }),
-            },
             // Server Change Cipher Spec, Server -> Client
             Step {
                 agent: client,
@@ -582,13 +606,6 @@ pub fn seed_successful12(
             Step {
                 agent: client,
                 action: Action::Input(InputAction {
-                    #[cfg(feature = "tls12-session-resumption")]
-                    recipe: term! {
-                        fn_opaque_message(
-                            ((server, 6)[None])
-                        )
-                    },
-                    #[cfg(not(feature = "tls12-session-resumption"))]
                     recipe: term! {
                         fn_opaque_message(
                             ((server, 5)[None])
@@ -2500,6 +2517,9 @@ pub mod tests {
 
     #[test]
     fn test_seed_successful12() {
+        #[cfg(feature = "tls12-session-resumption")]
+        let ctx = seed_successful12_with_tickets.execute_trace();
+        #[cfg(not(feature = "tls12-session-resumption"))]
         let ctx = seed_successful12.execute_trace();
         assert!(ctx.agents_successful());
     }
