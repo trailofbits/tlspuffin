@@ -11,6 +11,7 @@ use rustls::{
     msgs::{
         base::PayloadU8,
         codec::{Codec, Reader},
+        enums::NamedGroup,
         handshake::{
             CertificateEntry, CertificateExtension, HandshakeMessagePayload, HandshakePayload,
             Random, ServerECDHParams,
@@ -59,6 +60,7 @@ pub fn fn_decrypt_handshake(
         server_key_share,
         psk,
         false, // false, because only clients are decrypting right now, todo support both
+        NamedGroup::secp384r1,
     )?;
     let decrypter = suite
         .tls13()
@@ -112,8 +114,13 @@ pub fn fn_encrypt_handshake(
     psk: &Option<Vec<u8>>,
     sequence: &u64,
 ) -> Result<OpaqueMessage, FnError> {
-    let (suite, key, _) =
-        tls13_handshake_traffic_secret(server_hello, server_key_share, psk, true)?;
+    let (suite, key, _) = tls13_handshake_traffic_secret(
+        server_hello,
+        server_key_share,
+        psk,
+        false,
+        NamedGroup::X25519,
+    )?;
     let encrypter = suite
         .tls13()
         .ok_or_else(|| FnError::Rustls("No tls 1.3 suite".to_owned()))?

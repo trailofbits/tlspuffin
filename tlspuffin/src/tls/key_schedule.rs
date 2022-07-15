@@ -16,10 +16,10 @@ pub fn tls13_handshake_traffic_secret(
     server_key_share: &Option<Vec<u8>>,
     psk: &Option<Vec<u8>>,
     server: bool,
+    group: NamedGroup,
 ) -> Result<(&'static SupportedCipherSuite, Prk, KeyScheduleHandshake), FnError> {
     let client_random = &[1u8; 32]; // todo see op_random() https://github.com/tlspuffin/tlspuffin/issues/129
     let suite = &rustls::tls13::TLS13_AES_128_GCM_SHA256; // todo see op_cipher_suites() https://github.com/tlspuffin/tlspuffin/issues/129
-    let group = NamedGroup::secp384r1; // todo https://github.com/tlspuffin/tlspuffin/issues/129
     let key_schedule = dhe_key_schedule(suite, group, server_key_share, psk)?;
 
     let (hs, client_secret, server_secret) = key_schedule.derive_handshake_secrets(
@@ -50,8 +50,13 @@ pub fn tls13_application_traffic_secret(
     FnError,
 > {
     let client_random = &[1u8; 32]; // todo see op_random() https://github.com/tlspuffin/tlspuffin/issues/129
-    let (suite, _key, key_schedule) =
-        tls13_handshake_traffic_secret(server_hello, server_key_share, psk, server)?;
+    let (suite, _key, key_schedule) = tls13_handshake_traffic_secret(
+        server_hello,
+        server_key_share,
+        psk,
+        server,
+        NamedGroup::secp384r1,
+    )?;
 
     let (pending, client_secret, server_secret) = key_schedule
         .into_traffic_with_client_finished_pending_raw(

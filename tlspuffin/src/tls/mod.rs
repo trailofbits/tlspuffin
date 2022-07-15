@@ -185,6 +185,7 @@ define_signature!(
     fn_compression
     fn_compressions
     fn_get_server_key_share
+    fn_get_client_key_share
     fn_new_cipher_suites
     fn_new_random
     fn_new_session_id

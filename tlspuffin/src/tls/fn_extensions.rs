@@ -8,6 +8,7 @@
 //!
 
 use rustls::{
+    kx::X25519,
     kx_group::SECP384R1,
     msgs::{
         base::{Payload, PayloadU16, PayloadU24, PayloadU8},
@@ -15,7 +16,7 @@ use rustls::{
         handshake::*,
         message::Message,
     },
-    x509, ProtocolVersion, SignatureScheme,
+    x509, ProtocolVersion, SignatureScheme, SupportedKxGroup,
 };
 use webpki::DnsNameRef;
 
@@ -487,11 +488,11 @@ pub fn fn_key_share_extension(key_share: &Vec<u8>) -> Result<ClientExtension, Fn
     }]))
 }
 pub fn fn_key_share_deterministic_server_extension() -> Result<ServerExtension, FnError> {
-    fn_key_share_server_extension(&deterministic_key_share(&SECP384R1)?)
+    fn_key_share_server_extension(&deterministic_key_share(&X25519)?)
 }
 pub fn fn_key_share_server_extension(key_share: &Vec<u8>) -> Result<ServerExtension, FnError> {
     Ok(ServerExtension::KeyShare(KeyShareEntry {
-        group: NamedGroup::secp384r1,
+        group: NamedGroup::X25519,
         payload: PayloadU16::new(key_share.clone()),
     }))
 }

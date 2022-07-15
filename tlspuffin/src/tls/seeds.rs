@@ -675,6 +675,175 @@ pub fn seed_successful_with_tickets(
     trace
 }
 
+pub fn seed_server_attacker_full(client: AgentName, client_put: PutDescriptor) -> Trace {
+    let server_hello = term! {
+          fn_server_hello(
+            fn_protocol_version12,
+            fn_new_random,
+            fn_empty_session_id,
+            fn_cipher_suite13_aes_128_gcm_sha256,
+            fn_compression,
+            (fn_server_extensions_append(
+                (fn_server_extensions_append(
+                    fn_server_extensions_new,
+                    fn_key_share_deterministic_server_extension
+                )),
+                fn_supported_versions13_server_extension
+            ))
+        )
+    };
+
+    let server_hello_transcript = term! {
+        fn_append_transcript(
+            (fn_append_transcript(
+                fn_new_transcript,
+                ((client, 0)[Some(TlsMessageType::Handshake(Some(HandshakeType::ClientHello)))]) // ClientHello
+            )),
+            (@server_hello) // plaintext ServerHello
+        )
+    };
+
+    let encrypted_extensions = term! {
+        fn_encrypted_extensions(
+            fn_server_extensions_new
+        )
+    };
+
+    let certificate = term! {
+        fn_certificate13(
+            (fn_empty_bytes_vec), // FIXME
+            (fn_append_certificate_entry(
+                (fn_certificate_entry(
+                    fn_alice_cert
+                )),
+              fn_empty_certificate_chain
+            ))
+        )
+    };
+
+    let encrypted_extensions_transcript = term! {
+        fn_append_transcript(
+            (@server_hello_transcript),
+            (@encrypted_extensions) // plaintext EncryptedExtensions
+        )
+    };
+
+    let certificate_transcript = term! {
+        fn_append_transcript(
+            (@encrypted_extensions_transcript),
+            (@certificate) // plaintext Certificate
+        )
+    };
+
+    let certificate_verify = term! {
+        fn_certificate_verify(
+            fn_rsa_pss_signature_algorithm,
+            (fn_rsa_sign_server(
+                (@certificate_transcript),
+                fn_alice_key,
+                fn_rsa_pss_signature_algorithm
+            ))
+        )
+    };
+
+    let certificate_verify_transcript = term! {
+        fn_append_transcript(
+            (@certificate_transcript),
+            (@certificate_verify) // plaintext CertificateVerify
+        )
+    };
+
+    let server_finished = term! {
+        fn_finished(
+            (fn_verify_data_server(
+                (@certificate_verify_transcript),
+                //(fn_server_finished_transcript(((client, 0)))),
+                (@server_hello_transcript),
+                (fn_get_client_key_share(((client, 0)))),
+                fn_no_psk
+            ))
+        )
+    };
+
+    let trace = Trace {
+        prior_traces: vec![],
+        descriptors: vec![AgentDescriptor {
+            name: client,
+            tls_version: TLSVersion::V1_3,
+            typ: AgentType::Client,
+            put_descriptor: client_put,
+            ..AgentDescriptor::default()
+        }],
+        steps: vec![
+            OutputAction::new_step(client),
+            Step {
+                agent: client,
+                action: Action::Input(InputAction {
+                    recipe: server_hello,
+                }),
+            },
+            Step {
+                agent: client,
+                action: Action::Input(InputAction {
+                    recipe: term! {
+                        fn_encrypt_handshake(
+                            (@encrypted_extensions),
+                            (@server_hello_transcript),
+                            (fn_get_client_key_share(((client, 0)))),
+                            fn_no_psk,
+                            fn_seq_0  // sequence 0
+                        )
+                    },
+                }),
+            },
+            Step {
+                agent: client,
+                action: Action::Input(InputAction {
+                    recipe: term! {
+                        fn_encrypt_handshake(
+                            (@certificate),
+                            (@server_hello_transcript),
+                            (fn_get_client_key_share(((client, 0)))),
+                            fn_no_psk,
+                            fn_seq_1  // sequence 1
+                        )
+                    },
+                }),
+            },
+            Step {
+                agent: client,
+                action: Action::Input(InputAction {
+                    recipe: term! {
+                        fn_encrypt_handshake(
+                            (@certificate_verify),
+                            (@server_hello_transcript),
+                            (fn_get_client_key_share(((client, 0)))),
+                            fn_no_psk,
+                            fn_seq_2  // sequence 2
+                        )
+                    },
+                }),
+            },
+            Step {
+                agent: client,
+                action: Action::Input(InputAction {
+                    recipe: term! {
+                        fn_encrypt_handshake(
+                            (@server_finished),
+                            (@server_hello_transcript),
+                            (fn_get_client_key_share(((client, 0)))),
+                            fn_no_psk,
+                            fn_seq_3  // sequence 3
+                        )
+                    },
+                }),
+            },
+        ],
+    };
+
+    trace
+}
+
 pub fn seed_client_attacker_auth(server: AgentName, server_put: PutDescriptor) -> Trace {
     let client_hello = term! {
           fn_client_hello(
@@ -2433,6 +2602,13 @@ pub mod tests {
     #[test]
     fn test_seed_client_attacker_full() {
         let ctx = seed_client_attacker_full.execute_trace();
+        assert!(ctx.agents_successful());
+    }
+
+    #[cfg(feature = "tls13")] // require version which supports TLS 1.3
+    #[test]
+    fn test_seed_server_attacker_full() {
+        let ctx = seed_server_attacker_full.execute_trace();
         assert!(ctx.agents_successful());
     }
 
