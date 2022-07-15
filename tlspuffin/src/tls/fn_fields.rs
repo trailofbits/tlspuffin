@@ -1,6 +1,7 @@
 #![allow(clippy::ptr_arg)]
 #![allow(dead_code)]
 
+use itertools::Itertools;
 use rustls::{
     hash_hs::HandshakeHash,
     msgs::{
@@ -71,6 +72,7 @@ pub fn fn_get_server_key_share(
 
 pub fn fn_get_client_key_share(
     client_extensions: &Vec<ClientExtension>,
+    group: &NamedGroup,
 ) -> Result<Option<Vec<u8>>, FnError> {
     let client_extension = client_extensions
         .iter()
@@ -80,11 +82,27 @@ pub fn fn_get_client_key_share(
     if let ClientExtension::KeyShare(keyshares) = client_extension {
         let keyshare = keyshares
             .iter()
-            .find(|keyshare| keyshare.group == NamedGroup::X25519)
-            .ok_or(FnError::Unknown(
-                "KeyShare with group X25519 not found".to_string(),
-            ))?;
+            .find(|keyshare| keyshare.group == *group)
+            .ok_or(FnError::Unknown("Keyshare not found".to_string()))?;
         Ok(Some(keyshare.payload.0.clone()))
+    } else {
+        Err(FnError::Unknown("KeyShare extension not found".to_string()))
+    }
+}
+
+pub fn fn_get_any_client_curve(
+    client_extensions: &Vec<ClientExtension>,
+) -> Result<NamedGroup, FnError> {
+    let client_extension = client_extensions
+        .iter()
+        .find(|x| x.get_type() == ExtensionType::KeyShare)
+        .ok_or(FnError::Unknown("KeyShare extension not found".to_string()))?;
+
+    if let ClientExtension::KeyShare(keyshares) = client_extension {
+        Ok(keyshares
+            .get(0)
+            .ok_or(FnError::Unknown("Keyshare not found".to_string()))?
+            .group)
     } else {
         Err(FnError::Unknown("KeyShare extension not found".to_string()))
     }
@@ -95,11 +113,10 @@ pub fn fn_verify_data(
     server_hello: &HandshakeHash,
     server_key_share: &Option<Vec<u8>>,
     psk: &Option<Vec<u8>>,
+    group: &NamedGroup,
 ) -> Result<Vec<u8>, FnError> {
     let client_random = &[1u8; 32]; // todo see op_random() https://github.com/tlspuffin/tlspuffin/issues/129
     let suite = &rustls::tls13::TLS13_AES_128_GCM_SHA256; // todo see op_cipher_suites()
-
-    let group = NamedGroup::secp384r1; // todo https://github.com/tlspuffin/tlspuffin/issues/129
 
     let key_schedule = dhe_key_schedule(suite, group, server_key_share, psk)?;
 
@@ -125,12 +142,11 @@ pub fn fn_verify_data_server(
     server_finished: &HandshakeHash,
     server_hello: &HandshakeHash,
     server_key_share: &Option<Vec<u8>>,
+    group: &NamedGroup,
     psk: &Option<Vec<u8>>,
 ) -> Result<Vec<u8>, FnError> {
     let client_random = &[1u8; 32]; // todo see op_random() https://github.com/tlspuffin/tlspuffin/issues/129
     let suite = &rustls::tls13::TLS13_AES_128_GCM_SHA256; // todo see op_cipher_suites()
-
-    let group = NamedGroup::X25519; // todo https://github.com/tlspuffin/tlspuffin/issues/129
 
     let key_schedule = dhe_key_schedule(suite, group, server_key_share, psk)?;
 
@@ -153,8 +169,9 @@ pub fn fn_sign_transcript(
     server_random: &Random,
     server_ecdh_params: &ServerECDHParams,
     transcript: &HandshakeHash,
+    group: &NamedGroup,
 ) -> Result<Vec<u8>, FnError> {
-    let secrets = tls12_new_secrets(server_random, server_ecdh_params)?;
+    let secrets = tls12_new_secrets(server_random, server_ecdh_params, group)?;
 
     let vh = transcript.get_current_hash();
     Ok(secrets.client_verify_data(&vh))
