@@ -686,7 +686,7 @@ pub fn seed_server_attacker_full(client: AgentName, client_put: PutDescriptor) -
           fn_server_hello(
             fn_protocol_version12,
             fn_new_random,
-            fn_empty_session_id,
+            ((client, 0)[Some(TlsMessageType::Handshake(Some(HandshakeType::ClientHello)))]),
             fn_cipher_suite13_aes_128_gcm_sha256,
             fn_compression,
             (fn_server_extensions_append(
