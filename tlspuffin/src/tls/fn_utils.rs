@@ -266,7 +266,7 @@ pub fn fn_new_transcript12() -> Result<HandshakeHash, FnError> {
 pub fn fn_decode_ecdh_pubkey(data: &Vec<u8>) -> Result<Vec<u8>, FnError> {
     let mut rd = Reader::init(data.as_slice());
     let params = ServerECDHParams::read(&mut rd)
-        .ok_or_else(|| FnError::Unknown("Failed to create ServerECDHParams".to_string()))?;
+        .ok_or_else(|| FnError::Unknown("Failed to parse ecdh public key".to_string()))?;
     Ok(params.public.0)
 }
 
@@ -289,12 +289,10 @@ pub fn fn_encrypt12(
     server_ecdh_pubkey: &Vec<u8>,
     sequence: &u64,
 ) -> Result<OpaqueMessage, FnError> {
-    let secrets = tls12_new_secrets(server_random, server_ecdh_pubkey).unwrap();
+    let secrets = tls12_new_secrets(server_random, server_ecdh_pubkey)?;
 
     let (_decrypter, encrypter) = secrets.make_cipher_pair(Side::Client);
-    let encrypted = encrypter
-        .encrypt(PlainMessage::from(message.clone()).borrow(), *sequence)
-        .unwrap();
+    let encrypted = encrypter.encrypt(PlainMessage::from(message.clone()).borrow(), *sequence)?;
     Ok(encrypted)
 }
 
