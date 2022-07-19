@@ -61,7 +61,7 @@ pub fn tls12_key_exchange(group: &NamedGroup) -> Result<KeyExchange, FnError> {
 
 pub fn tls12_new_secrets(
     server_random: &Random,
-    server_ecdh_params: &ServerECDHParams,
+    server_ecdh_pubkey: &Vec<u8>,
     group: &NamedGroup,
 ) -> Result<ConnectionSecrets, FnError> {
     let suite = &rustls::cipher_suite::TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256; // todo https://github.com/tlspuffin/tlspuffin/issues/129
@@ -81,13 +81,8 @@ pub fn tls12_new_secrets(
     let suite = suite
         .tls12()
         .ok_or_else(|| FnError::Unknown("VersionNotCompatibleError".to_string()))?;
-    let secrets = ConnectionSecrets::from_key_exchange(
-        kx,
-        &server_ecdh_params.public.0,
-        None,
-        randoms,
-        suite,
-    )?;
+    let secrets =
+        ConnectionSecrets::from_key_exchange(kx, &server_ecdh_pubkey, None, randoms, suite)?;
     // master_secret is: 01 40 26 dd 53 3c 0a...
     Ok(secrets)
 }

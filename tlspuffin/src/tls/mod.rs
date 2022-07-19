@@ -211,7 +211,8 @@ define_signature!(
     fn_get_ticket_age_add
     fn_get_ticket_nonce
     fn_new_transcript12
-    fn_decode_ecdh_params
+    fn_decode_ecdh_pubkey
+    fn_encode_ec_pubkey12
     fn_new_pubkey12
     fn_encrypt12
     fn_new_certificate
