@@ -96,10 +96,10 @@ pub fn fn_verify_data(
 
 pub fn fn_sign_transcript(
     server_random: &Random,
-    server_ecdh_params: &ServerECDHParams,
+    server_ecdh_pubkey: &Vec<u8>,
     transcript: &HandshakeHash,
 ) -> Result<Vec<u8>, FnError> {
-    let secrets = tls12_new_secrets(server_random, server_ecdh_params)?;
+    let secrets = tls12_new_secrets(server_random, server_ecdh_pubkey).unwrap();
 
     let vh = transcript.get_current_hash();
     Ok(secrets.client_verify_data(&vh))
