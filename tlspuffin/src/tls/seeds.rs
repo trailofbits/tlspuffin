@@ -1550,8 +1550,7 @@ fn _seed_client_attacker12(server: AgentName, server_put: PutDescriptor) -> (Tra
     let client_key_exchange = term! {
         fn_client_key_exchange(
             (fn_encode_ec_pubkey12(
-                fn_new_pubkey12,
-                fn_named_group_secp384r1
+                (fn_new_pubkey12(fn_named_group_secp384r1))
             ))
         )
     };
