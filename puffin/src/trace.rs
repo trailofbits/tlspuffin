@@ -18,6 +18,7 @@ use std::{
     any::{Any, TypeId},
     borrow::{Borrow, BorrowMut},
     cell::{Ref, RefCell, RefMut},
+    collections::HashMap,
     convert::TryFrom,
     fmt::{Debug, Display, Formatter},
     hash::Hash,
@@ -40,7 +41,8 @@ use crate::{
     error::Error,
     io::MessageResult,
     protocol::{Message, OpaqueMessage, ProtocolBehavior},
-    put_registry::PutRegistry,
+    put::PutDescriptor,
+    put_registry::{Factory, PutRegistry},
     variable_data::VariableData,
 };
 
@@ -92,6 +94,7 @@ pub struct TraceContext<PB: ProtocolBehavior + 'static> {
     knowledge: Vec<Knowledge<PB::Matcher>>,
     agents: Vec<Agent<PB>>,
     claims: GlobalClaimList<PB::Claim>,
+    put_descriptors: HashMap<AgentName, PutDescriptor>,
     put_registry: &'static PutRegistry<PB>,
     phantom: PhantomData<PB>,
 }
@@ -106,6 +109,7 @@ impl<PB: ProtocolBehavior> TraceContext<PB> {
             knowledge: vec![],
             agents: vec![],
             claims,
+            put_descriptors: Default::default(),
             put_registry,
             phantom: Default::default(),
         }
@@ -254,6 +258,14 @@ impl<PB: ProtocolBehavior> TraceContext<PB> {
         })
     }
 
+    pub fn find_put_descriptor(&self, name: &AgentName) -> Option<&PutDescriptor> {
+        self.put_descriptors.get(name)
+    }
+
+    pub fn set_put_descriptor(&mut self, agent_name: AgentName, put_descriptor: PutDescriptor) {
+        self.put_descriptors.insert(agent_name, put_descriptor);
+    }
+
     pub fn reset_agents(&mut self) -> Result<(), Error> {
         for agent in &mut self.agents {
             agent.reset(agent.name)?;
@@ -269,6 +281,10 @@ impl<PB: ProtocolBehavior> TraceContext<PB> {
         }
 
         true
+    }
+
+    pub fn default_put(&self) -> Box<dyn Factory<PB>> {
+        self.put_registry.default_factory()
     }
 }
 
@@ -342,6 +358,26 @@ impl<M: Matcher> Trace<M> {
         PB: ProtocolBehavior<Matcher = M>,
     {
         let mut ctx = TraceContext::new(put_registry);
+        self.execute(&mut ctx).unwrap();
+        ctx
+    }
+
+    pub fn execute_with_puts<PB>(
+        &self,
+        put_registry: &'static PutRegistry<PB>,
+        descriptors: &[PutDescriptor],
+    ) -> TraceContext<PB>
+    where
+        PB: ProtocolBehavior<Matcher = M>,
+    {
+        let mut ctx = TraceContext::new(put_registry);
+
+        let mut agent_name = AgentName::new();
+        for descriptor in descriptors {
+            ctx.set_put_descriptor(agent_name, descriptor.clone());
+            agent_name = agent_name.next();
+        }
+
         self.execute(&mut ctx).unwrap();
         ctx
     }

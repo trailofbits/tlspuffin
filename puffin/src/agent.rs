@@ -62,7 +62,6 @@ impl fmt::Display for AgentName {
 #[derive(Debug, Clone, Deserialize, Serialize, Eq, PartialEq, Hash)]
 pub struct AgentDescriptor {
     pub name: AgentName,
-    pub put_descriptor: PutDescriptor,
     pub tls_version: TLSVersion,
     /// Whether the agent which holds this descriptor is a server.
     pub typ: AgentType,
@@ -89,7 +88,6 @@ impl Default for AgentDescriptor {
     fn default() -> Self {
         Self {
             name: AgentName::first(),
-            put_descriptor: PutDescriptor::default(),
             tls_version: TLSVersion::V1_3,
             typ: AgentType::Server,
             try_reuse: false,
@@ -100,60 +98,40 @@ impl Default for AgentDescriptor {
 }
 
 impl AgentDescriptor {
-    pub fn new_reusable_server(
-        name: AgentName,
-        tls_version: TLSVersion,
-        put_descriptor: PutDescriptor,
-    ) -> Self {
+    pub fn new_reusable_server(name: AgentName, tls_version: TLSVersion) -> Self {
         Self {
             name,
             tls_version,
             typ: AgentType::Server,
             try_reuse: true,
-            put_descriptor,
             ..AgentDescriptor::default()
         }
     }
 
-    pub fn new_reusable_client(
-        name: AgentName,
-        tls_version: TLSVersion,
-        put_descriptor: PutDescriptor,
-    ) -> Self {
+    pub fn new_reusable_client(name: AgentName, tls_version: TLSVersion) -> Self {
         Self {
             name,
             tls_version,
             typ: AgentType::Client,
             try_reuse: true,
-            put_descriptor,
             ..AgentDescriptor::default()
         }
     }
 
-    pub fn new_server(
-        name: AgentName,
-        tls_version: TLSVersion,
-        put_descriptor: PutDescriptor,
-    ) -> Self {
+    pub fn new_server(name: AgentName, tls_version: TLSVersion) -> Self {
         Self {
             name,
             tls_version,
             typ: AgentType::Server,
-            put_descriptor,
             ..AgentDescriptor::default()
         }
     }
 
-    pub fn new_client(
-        name: AgentName,
-        tls_version: TLSVersion,
-        put_descriptor: PutDescriptor,
-    ) -> Self {
+    pub fn new_client(name: AgentName, tls_version: TLSVersion) -> Self {
         Self {
             name,
             tls_version,
             typ: AgentType::Client,
-            put_descriptor,
             ..AgentDescriptor::default()
         }
     }
@@ -170,25 +148,39 @@ pub struct Agent<PB: ProtocolBehavior> {
     pub name: AgentName,
     pub typ: AgentType,
     pub put: Box<dyn Put<PB>>,
+    pub put_descriptor: PutDescriptor,
 }
 
 impl<PB: ProtocolBehavior> Agent<PB> {
-    pub fn new(context: &TraceContext<PB>, descriptor: &AgentDescriptor) -> Result<Self, Error> {
-        let factory = context
-            .put_registry()
-            .find_factory(descriptor.put_descriptor.name)
-            .ok_or_else(|| {
-                Error::Agent(format!(
-                    "unable to find PUT {} factory in binary",
-                    &descriptor.put_descriptor.name
-                ))
-            })?;
+    pub fn new(
+        context: &TraceContext<PB>,
+        agent_descriptor: &AgentDescriptor,
+    ) -> Result<Self, Error> {
+        let put_descriptor = context.find_put_descriptor(&agent_descriptor.name);
 
-        let mut stream = factory.create(context, descriptor)?;
+        let factory = if let Some(put_descriptor) = put_descriptor {
+            context
+                .put_registry()
+                .find_factory(put_descriptor.name)
+                .ok_or_else(|| {
+                    Error::Agent(format!(
+                        "unable to find PUT {} factory in binary",
+                        &put_descriptor.name
+                    ))
+                })?
+        } else {
+            context.default_put()
+        };
+
+        let mut stream = factory.create(context, agent_descriptor)?;
         let agent = Agent {
-            name: descriptor.name,
-            typ: descriptor.typ,
+            name: agent_descriptor.name,
+            typ: agent_descriptor.typ,
             put: stream,
+            put_descriptor: put_descriptor.cloned().unwrap_or_else(|| PutDescriptor {
+                name: factory.put_name(),
+                options: Default::default(),
+            }),
         };
 
         Ok(agent)
