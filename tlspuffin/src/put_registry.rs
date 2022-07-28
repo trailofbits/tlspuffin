@@ -29,10 +29,6 @@ impl ProtocolBehavior for TLSProtocolBehavior {
 
     type Matcher = TlsQueryMatcher;
 
-    fn extract_knowledge(message: &Self::Message) -> Result<Vec<Box<dyn VariableData>>, Error> {
-        extract_knowledge(message)
-    }
-
     fn signature() -> &'static Signature {
         &TLS_SIGNATURE
     }
@@ -49,6 +45,10 @@ impl ProtocolBehavior for TLSProtocolBehavior {
         message_result: &MessageResult<Self::Message, Self::OpaqueMessage>,
     ) -> Self::Matcher {
         TlsQueryMatcher::try_from(message_result).unwrap()
+    }
+
+    fn extract_knowledge(message: &Self::Message) -> Result<Vec<Box<dyn VariableData>>, Error> {
+        extract_knowledge(message)
     }
 }
 
