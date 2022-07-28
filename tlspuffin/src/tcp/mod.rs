@@ -39,14 +39,7 @@ pub fn new_tcp_factory() -> Box<dyn Factory<TLSProtocolBehavior>> {
             context: &TraceContext<TLSProtocolBehavior>,
             agent_descriptor: &AgentDescriptor,
         ) -> Result<Box<dyn Put<TLSProtocolBehavior>>, Error> {
-            let put_descriptor = context
-                .find_put_descriptor(&agent_descriptor.name)
-                .ok_or_else(|| {
-                    Error::Agent(format!(
-                        "To use the TCP put you need to setup PUT descriptors for agent {}",
-                        &agent_descriptor.name
-                    ))
-                })?;
+            let put_descriptor = context.put_descriptor(agent_descriptor);
 
             let options = &put_descriptor.options;
 
@@ -64,12 +57,12 @@ pub fn new_tcp_factory() -> Box<dyn Factory<TLSProtocolBehavior>> {
                 .unwrap_or_default();
 
             if agent_descriptor.typ == AgentType::Client {
-                let mut server = TcpServerPut::new(agent_descriptor, put_descriptor)?;
+                let mut server = TcpServerPut::new(agent_descriptor, &put_descriptor)?;
                 server.set_process(TLSProcess::new(&prog, &args, cwd.as_ref()));
                 Ok(Box::new(server))
             } else {
                 let process = TLSProcess::new(&prog, &args, cwd);
-                let mut client = TcpClientPut::new(agent_descriptor, put_descriptor)?;
+                let mut client = TcpClientPut::new(agent_descriptor, &put_descriptor)?;
                 client.set_process(process);
                 Ok(Box::new(client))
             }
@@ -699,7 +692,12 @@ mod tests {
         };
 
         let trace = seed_session_resumption_dhe_full.build_trace();
-        let mut context = trace.execute_with_puts(&TLS_PUT_REGISTRY, &[put.clone(), put]);
+        let initial_server = trace.prior_traces[0].descriptors[0].name;
+        let server = trace.descriptors[0].name;
+        let mut context = trace.execute_with_puts(
+            &TLS_PUT_REGISTRY,
+            &[(initial_server, put.clone()), (server, put)],
+        );
 
         let server = AgentName::first().next();
         let shutdown = context.find_agent_mut(server).unwrap().put.shutdown();
@@ -718,7 +716,8 @@ mod tests {
         };
 
         let trace = seed_client_attacker_full.build_trace();
-        let mut context = trace.execute_with_puts(&TLS_PUT_REGISTRY, &[put]);
+        let server = trace.descriptors[0].name;
+        let mut context = trace.execute_with_puts(&TLS_PUT_REGISTRY, &[(server, put)]);
 
         let server = AgentName::first();
         let shutdown = context.find_agent_mut(server).unwrap().put.shutdown();
@@ -746,8 +745,13 @@ mod tests {
         };
 
         let trace = seed_successful12_with_tickets.build_trace();
-        let mut context =
-            trace.execute_with_puts(&TLS_PUT_REGISTRY, &[client.clone(), server.clone()]);
+        let descriptors = &trace.descriptors;
+        let client_name = descriptors[0].name;
+        let server_name = descriptors[1].name;
+        let mut context = trace.execute_with_puts(
+            &TLS_PUT_REGISTRY,
+            &[(client_name, client.clone()), (server_name, server.clone())],
+        );
 
         let client = AgentName::first();
         let shutdown = context.find_agent_mut(client).unwrap().put.shutdown();
@@ -780,8 +784,13 @@ mod tests {
         };
 
         let trace = seed_successful12_with_tickets.build_trace();
-        let mut context =
-            trace.execute_with_puts(&TLS_PUT_REGISTRY, &[client.clone(), server.clone()]);
+        let descriptors = &trace.descriptors;
+        let client_name = descriptors[0].name;
+        let server_name = descriptors[1].name;
+        let mut context = trace.execute_with_puts(
+            &TLS_PUT_REGISTRY,
+            &[(client_name, client.clone()), (server_name, server.clone())],
+        );
 
         let client = AgentName::first();
         let shutdown = context.find_agent_mut(client).unwrap().put.shutdown();

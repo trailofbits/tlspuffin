@@ -64,7 +64,7 @@ pub const TLS_PUT_REGISTRY: PutRegistry<TLSProtocolBehavior> = PutRegistry {
         #[cfg(feature = "wolfssl-binding")]
         crate::wolfssl::new_wolfssl_factory,
     ],
-    default: DEFAULT_PUT_FACTORY, // FIXME: better default?
+    default: DEFAULT_PUT_FACTORY,
 };
 
 pub const DEFAULT_PUT_FACTORY: fn() -> Box<dyn Factory<TLSProtocolBehavior>> = {

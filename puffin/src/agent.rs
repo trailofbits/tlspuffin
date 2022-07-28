@@ -156,31 +156,24 @@ impl<PB: ProtocolBehavior> Agent<PB> {
         context: &TraceContext<PB>,
         agent_descriptor: &AgentDescriptor,
     ) -> Result<Self, Error> {
-        let put_descriptor = context.find_put_descriptor(&agent_descriptor.name);
+        let put_descriptor = context.put_descriptor(agent_descriptor);
 
-        let factory = if let Some(put_descriptor) = put_descriptor {
-            context
-                .put_registry()
-                .find_factory(put_descriptor.name)
-                .ok_or_else(|| {
-                    Error::Agent(format!(
-                        "unable to find PUT {} factory in binary",
-                        &put_descriptor.name
-                    ))
-                })?
-        } else {
-            context.default_put()
-        };
+        let factory = context
+            .put_registry()
+            .find_factory(put_descriptor.name)
+            .ok_or_else(|| {
+                Error::Agent(format!(
+                    "unable to find PUT {} factory in binary",
+                    &put_descriptor.name
+                ))
+            })?;
 
         let mut stream = factory.create(context, agent_descriptor)?;
         let agent = Agent {
             name: agent_descriptor.name,
             typ: agent_descriptor.typ,
             put: stream,
-            put_descriptor: put_descriptor.cloned().unwrap_or_else(|| PutDescriptor {
-                name: factory.put_name(),
-                options: Default::default(),
-            }),
+            put_descriptor,
         };
 
         Ok(agent)

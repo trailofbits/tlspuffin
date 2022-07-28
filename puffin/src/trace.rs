@@ -258,12 +258,27 @@ impl<PB: ProtocolBehavior> TraceContext<PB> {
         })
     }
 
-    pub fn find_put_descriptor(&self, name: &AgentName) -> Option<&PutDescriptor> {
-        self.put_descriptors.get(name)
+    /// Gets the PUT which should be used for all agents
+    pub fn put_descriptor(&self, agent_descriptor: &AgentDescriptor) -> PutDescriptor {
+        self.put_descriptors
+            .get(&agent_descriptor.name)
+            .cloned()
+            .unwrap_or_else(|| {
+                let factory = (self.put_registry.default)();
+                PutDescriptor {
+                    name: factory.put_name(),
+                    options: Default::default(),
+                }
+            })
     }
 
-    pub fn set_put_descriptor(&mut self, agent_name: AgentName, put_descriptor: PutDescriptor) {
+    /// Makes agents use the non-default PUT
+    pub fn set_non_default_put(&mut self, agent_name: AgentName, put_descriptor: PutDescriptor) {
         self.put_descriptors.insert(agent_name, put_descriptor);
+    }
+
+    pub fn set_non_default_puts(&mut self, descriptors: &[(AgentName, PutDescriptor)]) {
+        self.put_descriptors.extend(descriptors.iter().cloned());
     }
 
     pub fn reset_agents(&mut self) -> Result<(), Error> {
@@ -365,18 +380,14 @@ impl<M: Matcher> Trace<M> {
     pub fn execute_with_puts<PB>(
         &self,
         put_registry: &'static PutRegistry<PB>,
-        descriptors: &[PutDescriptor],
+        descriptors: &[(AgentName, PutDescriptor)],
     ) -> TraceContext<PB>
     where
         PB: ProtocolBehavior<Matcher = M>,
     {
         let mut ctx = TraceContext::new(put_registry);
 
-        let mut agent_name = AgentName::new();
-        for descriptor in descriptors {
-            ctx.set_put_descriptor(agent_name, descriptor.clone());
-            agent_name = agent_name.next();
-        }
+        ctx.set_non_default_puts(descriptors);
 
         self.execute(&mut ctx).unwrap();
         ctx
